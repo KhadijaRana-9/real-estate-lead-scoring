@@ -3,16 +3,19 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-brand-50: #f0f9f6;
-  --color-brand-100: #d9f0e8;
-  --color-brand-200: #b3e1d1;
-  --color-brand-300: #7fcbb2;
-  --color-brand-400: #45ad8d;
-  --color-brand-500: #1f9271;
-  --color-brand-600: #16755b;
-  --color-brand-700: #145e4a;
-  --color-brand-800: #124b3c;
-  --color-brand-900: #0f3e32;
+  --color-brand-50: #ecfdf5;
+  --color-brand-100: #d1fae5;
+  --color-brand-200: #a7f3d0;
+  --color-brand-300: #6ee7b7;
+  --color-brand-400: #34d399;
+  --color-brand-500: #10b981;
+  --color-brand-600: #0f766e;
+  --color-brand-700: #115e59;
+  --color-brand-800: #134e4a;
+  --color-brand-900: #042f2e;
+
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-heading: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
 }
 
 html {
@@ -20,5 +23,34 @@ html {
 }
 
 body {
+  font-family: var(--font-sans);
   @apply bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+}
+
+@keyframes gradient-mesh {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.animate-gradient-mesh {
+  background-size: 200% 200%;
+  animation: gradient-mesh 18s ease infinite;
+}
+
+.hero-mesh {
+  background-image:
+    radial-gradient(circle at 15% 20%, color-mix(in oklab, var(--color-brand-300) 35%, transparent) 0%, transparent 45%),
+    radial-gradient(circle at 85% 15%, color-mix(in oklab, #60a5fa 30%, transparent) 0%, transparent 45%),
+    radial-gradient(circle at 50% 90%, color-mix(in oklab, var(--color-brand-400) 25%, transparent) 0%, transparent 50%);
+}
+
+.dark .hero-mesh {
+  background-image:
+    radial-gradient(circle at 15% 20%, color-mix(in oklab, var(--color-brand-700) 35%, transparent) 0%, transparent 45%),
+    radial-gradient(circle at 85% 15%, color-mix(in oklab, #1d4ed8 30%, transparent) 0%, transparent 45%),
+    radial-gradient(circle at 50% 90%, color-mix(in oklab, var(--color-brand-800) 30%, transparent) 0%, transparent 50%);
 }

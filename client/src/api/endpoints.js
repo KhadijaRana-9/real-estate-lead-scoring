@@ -15,3 +15,4 @@ export const createInquiry = (data) => api.post('/inquiries', data)
 export const getInquiries = () => api.get('/inquiries')
 
 export const getDashboardSummary = () => api.get('/dashboard/summary')
+export const getPublicStats = () => api.get('/dashboard/public-stats')

@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
+import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { FiMapPin, FiMaximize2 } from 'react-icons/fi'
+import confetti from 'canvas-confetti'
+import { FiMapPin, FiMaximize2, FiCheckCircle } from 'react-icons/fi'
 import { PiBathtub, PiBed } from 'react-icons/pi'
 import * as api from '../api/endpoints'
 import EmptyState from '../components/EmptyState'
+import ScoreRing from '../components/ScoreRing'
 import { formatPKR } from '../utils/format'
+
+const STATUS_LABEL = { hot: 'HOT LEAD', warm: 'WARM LEAD', cold: 'COLD LEAD' }
 
 const TIMELINE_OPTIONS = [
   { value: 'immediate', label: 'Immediately' },
@@ -20,6 +25,7 @@ export default function PropertyDetail() {
   const [property, setProperty] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [submitted, setSubmitted] = useState(null)
 
   const {
     register,
@@ -49,9 +55,13 @@ export default function PropertyDetail() {
 
   const onSubmit = async (formValues) => {
     try {
-      await api.createInquiry({ propertyId: id, ...formValues, budget: Number(formValues.budget) })
+      const { data } = await api.createInquiry({ propertyId: id, ...formValues, budget: Number(formValues.budget) })
       toast.success('Inquiry sent! The agent will get back to you soon.')
       reset()
+      setSubmitted({ score: data.score, status: data.status })
+      if (data.status === 'hot') {
+        confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } })
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not send inquiry, please try again.')
     }
@@ -102,6 +112,33 @@ export default function PropertyDetail() {
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+          {submitted ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3 }}
+              className="flex flex-col items-center py-4 text-center"
+            >
+              <FiCheckCircle className="text-4xl text-brand-600 dark:text-brand-400" />
+              <h2 className="mt-2 text-lg font-semibold">Inquiry Submitted Successfully</h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">We'll notify the agent immediately.</p>
+
+              <div className="mt-4">
+                <ScoreRing score={submitted.score} status={submitted.status} size={100} />
+              </div>
+              <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+                {STATUS_LABEL[submitted.status]} &middot; {submitted.score}/100
+              </p>
+
+              <button
+                onClick={() => setSubmitted(null)}
+                className="mt-5 text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+              >
+                Send another inquiry
+              </button>
+            </motion.div>
+          ) : (
+            <>
           <h2 className="mb-4 text-lg font-semibold">Interested in this property?</h2>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
             <div>
@@ -166,6 +203,8 @@ export default function PropertyDetail() {
               {isSubmitting ? 'Sending...' : 'Send Inquiry'}
             </button>
           </form>
+            </>
+          )}
         </div>
       </div>
     </div>

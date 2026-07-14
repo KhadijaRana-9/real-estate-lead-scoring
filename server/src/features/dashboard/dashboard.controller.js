@@ -9,4 +9,13 @@ async function summary(req, res, next) {
   }
 }
 
-module.exports = { summary };
+async function publicStats(req, res, next) {
+  try {
+    const result = await dashboardService.getPublicStats();
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { summary, publicStats };

@@ -1,5 +1,16 @@
 const Property = require('../property/property.model');
 const Inquiry = require('../inquiry/inquiry.model');
+const User = require('../auth/auth.model');
+
+async function getPublicStats() {
+  const [properties, cities, agents] = await Promise.all([
+    Property.countDocuments({ status: 'available' }),
+    Property.distinct('city'),
+    User.countDocuments({ role: 'agent' }),
+  ]);
+
+  return { properties, cities: cities.length, agents };
+}
 
 async function getSummary(requester) {
   const propertyFilter = requester.role === 'admin' ? {} : { agent: requester.id };
@@ -74,4 +85,4 @@ function buildMonthlyTrend(inquiries) {
     .map(([month, count]) => ({ month, count }));
 }
 
-module.exports = { getSummary };
+module.exports = { getSummary, getPublicStats };

@@ -14,11 +14,39 @@ function useDarkMode() {
   return [dark, setDark]
 }
 
+function useScrolled() {
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  return scrolled
+}
+
 export default function Navbar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [dark, setDark] = useDarkMode()
   const [menuOpen, setMenuOpen] = useState(false)
+  const scrolled = useScrolled()
+
+  const isAgentOrAdmin = user && (user.role === 'agent' || user.role === 'admin')
+
+  const navLinks = isAgentOrAdmin
+    ? [
+        { to: '/dashboard', label: 'Dashboard' },
+        { to: '/dashboard?tab=My%20Listings', label: 'Listings' },
+        { to: '/dashboard?tab=Leads', label: 'Leads' },
+      ]
+    : [
+        { to: '/listings', label: 'Buy' },
+        { to: '/signup', label: 'For Agents' },
+        { to: '/about', label: 'About' },
+      ]
 
   const handleLogout = () => {
     logout()
@@ -26,17 +54,24 @@ export default function Navbar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/80 backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
+    <header
+      className={`sticky top-0 z-40 border-b transition-all duration-300 ${
+        scrolled
+          ? 'border-gray-200 bg-white/80 shadow-sm backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/80'
+          : 'border-transparent bg-white/40 backdrop-blur-sm dark:bg-gray-950/40'
+      }`}
+    >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2 text-xl font-bold text-brand-600 dark:text-brand-400">
           <FiHome /> DreamHomes
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
-          <Link to="/listings" className="hover:text-brand-600 dark:hover:text-brand-400">Properties</Link>
-          {user && (user.role === 'agent' || user.role === 'admin') && (
-            <Link to="/dashboard" className="hover:text-brand-600 dark:hover:text-brand-400">Dashboard</Link>
-          )}
+          {navLinks.map((link) => (
+            <Link key={link.to} to={link.to} className="hover:text-brand-600 dark:hover:text-brand-400">
+              {link.label}
+            </Link>
+          ))}
         </nav>
 
         <div className="hidden items-center gap-4 md:flex">
@@ -77,10 +112,11 @@ export default function Navbar() {
       {menuOpen && (
         <div className="border-t border-gray-200 px-4 py-3 md:hidden dark:border-gray-800">
           <div className="flex flex-col gap-3 text-sm font-medium">
-            <Link to="/listings" onClick={() => setMenuOpen(false)}>Properties</Link>
-            {user && (user.role === 'agent' || user.role === 'admin') && (
-              <Link to="/dashboard" onClick={() => setMenuOpen(false)}>Dashboard</Link>
-            )}
+            {navLinks.map((link) => (
+              <Link key={link.to} to={link.to} onClick={() => setMenuOpen(false)}>
+                {link.label}
+              </Link>
+            ))}
             <button className="text-left" onClick={() => setDark((d) => !d)}>
               {dark ? 'Light mode' : 'Dark mode'}
             </button>

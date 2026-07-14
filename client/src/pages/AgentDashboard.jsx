@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { FiHome, FiMail, FiTrendingUp, FiStar, FiEye } from 'react-icons/fi'
+import { FaFire } from 'react-icons/fa'
 import * as api from '../api/endpoints'
 import StatCard from '../components/StatCard'
 import EmptyState from '../components/EmptyState'
 import PropertyFormModal from '../components/PropertyFormModal'
 import LeadScoreBreakdown from '../components/LeadScoreBreakdown'
+import RecentActivity from '../components/RecentActivity'
 import LeadStatusPie from '../components/charts/LeadStatusPie'
 import MonthlyInquiriesLine from '../components/charts/MonthlyInquiriesLine'
 import TopPropertiesBar from '../components/charts/TopPropertiesBar'
@@ -13,7 +17,14 @@ import { formatPKR, formatDate } from '../utils/format'
 const TABS = ['Overview', 'Leads', 'My Listings']
 
 export default function AgentDashboard() {
-  const [tab, setTab] = useState('Overview')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialTab = TABS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'Overview'
+  const [tab, setTabState] = useState(initialTab)
+
+  const setTab = (next) => {
+    setTabState(next)
+    setSearchParams(next === 'Overview' ? {} : { tab: next })
+  }
   const [summary, setSummary] = useState(null)
   const [inquiries, setInquiries] = useState([])
   const [properties, setProperties] = useState([])
@@ -109,19 +120,21 @@ export default function AgentDashboard() {
       {tab === 'Overview' && (
         <div className="space-y-8">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard label="Properties" value={summary.cards.totalProperties} />
-            <StatCard label="Inquiries" value={summary.cards.totalInquiries} />
-            <StatCard label="Hot Leads" value={summary.cards.hotLeads} sub="🔥 score ≥ 70" />
-            <StatCard label="Avg Lead Score" value={summary.cards.averageLeadScore} />
+            <StatCard label="Properties" value={summary.cards.totalProperties} icon={<FiHome />} />
+            <StatCard label="Inquiries" value={summary.cards.totalInquiries} icon={<FiMail />} />
+            <StatCard label="Hot Leads" value={summary.cards.hotLeads} sub="score ≥ 70" icon={<FaFire />} />
+            <StatCard label="Avg Lead Score" value={summary.cards.averageLeadScore} icon={<FiTrendingUp />} />
             <StatCard
               label="Highest Scoring Lead"
               value={summary.cards.highestScoringLead ? summary.cards.highestScoringLead.score : '—'}
               sub={summary.cards.highestScoringLead?.name}
+              icon={<FiStar />}
             />
             <StatCard
               label="Most Viewed Property"
               value={summary.cards.mostViewedProperty ? summary.cards.mostViewedProperty.views : '—'}
               sub={summary.cards.mostViewedProperty?.title}
+              icon={<FiEye />}
             />
           </div>
 
@@ -138,6 +151,11 @@ export default function AgentDashboard() {
               <h3 className="mb-2 text-sm font-semibold">Top Properties by Views</h3>
               <TopPropertiesBar data={summary.charts.topProperties} />
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+            <h3 className="mb-3 text-sm font-semibold">Recent Activity</h3>
+            <RecentActivity properties={properties} inquiries={inquiries} />
           </div>
         </div>
       )}

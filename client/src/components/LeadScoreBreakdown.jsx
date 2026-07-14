@@ -1,10 +1,17 @@
+import { motion } from 'framer-motion'
+import ScoreRing from './ScoreRing'
+
 const STATUS_STYLES = {
   hot: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
   warm: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300',
   cold: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
 }
 
-const STATUS_EMOJI = { hot: '\u{1F525}', warm: '\u{1F7E0}', cold: '\u{1F535}' }
+const BAR_COLORS = {
+  hot: 'bg-red-500',
+  warm: 'bg-orange-500',
+  cold: 'bg-blue-500',
+}
 
 export default function LeadScoreBreakdown({ score, status, breakdown }) {
   const items = [
@@ -15,22 +22,30 @@ export default function LeadScoreBreakdown({ score, status, breakdown }) {
   ]
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <span className="text-2xl font-bold">{score}/100</span>
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${STATUS_STYLES[status]}`}>
-          {STATUS_EMOJI[status]} {status}
+    <div className="flex items-start gap-4">
+      <ScoreRing score={score} status={status} />
+      <div className="flex-1 space-y-2">
+        <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold capitalize ${STATUS_STYLES[status]}`}>
+          {status} lead
         </span>
-      </div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-400">
-        {items.map((item) => (
-          <div key={item.label} className="flex justify-between">
-            <span>{item.label}</span>
-            <span className="font-medium text-gray-800 dark:text-gray-200">
-              {item.value}/{item.max}
-            </span>
-          </div>
-        ))}
+        <div className="space-y-1.5">
+          {items.map((item) => (
+            <div key={item.label}>
+              <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                <span>{item.label}</span>
+                <span className="font-medium text-gray-800 dark:text-gray-200">{item.value}/{item.max}</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                <motion.div
+                  className={`h-full rounded-full ${BAR_COLORS[status]}`}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(item.value / item.max) * 100}%` }}
+                  transition={{ duration: 0.6, ease: 'easeOut' }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

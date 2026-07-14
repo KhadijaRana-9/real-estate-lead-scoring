@@ -17,8 +17,9 @@ export default function PropertyCard({ property }) {
       layout
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -6 }}
       transition={{ duration: 0.25 }}
-      className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:shadow-lg dark:border-gray-800 dark:bg-gray-900"
+      className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-xl dark:border-gray-800 dark:bg-gray-900"
     >
       <Link to={`/properties/${property._id}`}>
         <div className="relative h-48 w-full overflow-hidden">
