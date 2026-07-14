@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-brand-50: #f0f9f6;
+  --color-brand-100: #d9f0e8;
+  --color-brand-200: #b3e1d1;
+  --color-brand-300: #7fcbb2;
+  --color-brand-400: #45ad8d;
+  --color-brand-500: #1f9271;
+  --color-brand-600: #16755b;
+  --color-brand-700: #145e4a;
+  --color-brand-800: #124b3c;
+  --color-brand-900: #0f3e32;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100;
+}
