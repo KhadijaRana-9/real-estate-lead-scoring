@@ -10,7 +10,8 @@ const { notFound, errorHandler } = require('./shared/middleware/error');
 function createApp(env) {
   const app = express();
 
-  app.use(cors({ origin: env.clientOrigin }));
+  const allowedOrigins = env.clientOrigin.split(',').map((origin) => origin.trim());
+  app.use(cors({ origin: allowedOrigins }));
   app.use(express.json());
 
   app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
