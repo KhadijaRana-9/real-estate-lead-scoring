@@ -2,7 +2,7 @@
 
 A full-stack real-estate portal: property listings with search/filter, an inquiry
 flow that captures leads, an agent dashboard with analytics, and two "smart"
-logic features — deterministic **lead scoring** and a **price estimator** — both
+logic features deterministic **lead scoring** and a **price estimator**  both
 explainable rather than black boxes.
 
 ## Live Demo
