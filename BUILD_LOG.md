@@ -2,11 +2,11 @@
 
 ## What was built
 
-DreamHomes — a full-stack MERN real-estate portal: property listings with
+DreamHomes, a full-stack MERN real-estate portal: property listings with
 create/search/filter, an inquiry flow that captures leads, an agent dashboard
-with analytics, and two explainable "smart" features rather than one — a
-**deterministic lead-scoring formula** (budget match, urgency, interest,
-popularity → 0–100, hot/warm/cold) and an **itemized price estimator**. JWT
+with analytics, and two explainable "smart" features rather than one, namely
+a **deterministic lead-scoring formula** (budget match, urgency, interest,
+popularity → 0-100, hot/warm/cold) and an **itemized price estimator**. JWT
 auth with three roles (admin/agent/customer), a feature-based Express backend,
 a React/Vite frontend with Tailwind v4 and Framer Motion, deployed live on
 Vercel (frontend + backend as separate projects, unified behind one domain via
@@ -20,8 +20,8 @@ for autocomplete or isolated snippets. Concretely:
 
 - **Planning first**: before any code, Claude Code was put into plan mode to
   scope the build (MVP vs. stretch features), design the data model, the
-  lead-scoring formula, and the API surface — reviewed and approved before
-  implementation started.
+  lead-scoring formula, and the API surface. This plan was reviewed and
+  approved before implementation started.
 - **Full-stack implementation**: every backend feature module (auth, property,
   inquiry, dashboard), every React page/component, the Tailwind design tokens,
   and the seed script were written by the agent from the approved plan.
@@ -39,25 +39,25 @@ for autocomplete or isolated snippets. Concretely:
   reliable than click-by-click guidance.
 - **Design iteration**: a first UI pass was built and verified, then a second,
   explicitly curated round of polish (animated lead-score ring, confetti
-  success state, hero stats, page transitions) was added on top — deliberately
-  scoped down from a much larger animation wishlist to avoid churn on an
-  already-working app.
+  success state, hero stats, page transitions) was added on top. This was
+  deliberately scoped down from a much larger animation wishlist to avoid
+  churn on an already-working app.
 - **Documentation**: this file, the README, and a separate `DESIGN.md`
-  (information architecture + design-token reference) were all written by the
-  agent, reflecting what was actually shipped rather than aspirational copy.
+  (information architecture and design-token reference) were all written by
+  the agent, reflecting what was actually shipped rather than aspirational copy.
 
-Every step was reviewed in the loop — nothing was merged or deployed
-unattended; the human made the scope, deployment-target, and account
+Every step was reviewed in the loop; nothing was merged or deployed
+unattended. The human made the scope, deployment-target, and account
 decisions, and verified functionality by exercising the running app directly.
 
 ## What was learned
 
 - **Deciding scope before writing code** (MVP vs. stretch features, explicitly
   written down and agreed) avoided ending up with five half-built features
-  instead of one polished one — and made it easy to say "no, not now" to later
+  instead of one polished one, and made it easy to say "no, not now" to later
   scope-creep requests without it feeling arbitrary.
 - **Persisting the lead-score breakdown**, not just the total, on the Inquiry
-  document made "explainable scoring" almost free on the frontend — the UI
+  document made "explainable scoring" almost free on the frontend: the UI
   just renders fields that were already being computed and stored.
 - **Verify environment assumptions before relying on them.** Both MongoDB and
   Git were assumed installed based on a flawed check early on; the actual gap
@@ -65,7 +65,7 @@ decisions, and verified functionality by exercising the running app directly.
   expensive to discover mid-build.
 - **Fabricated data is a real trust problem, not just a style choice.**
   Template-style stats ("500+ agents", hardcoded counts) were rejected in
-  favor of a real `/api/dashboard/public-stats` endpoint — even when the real
+  favor of a real `/api/dashboard/public-stats` endpoint. Even when the real
   number is small, it's honest.
 - **A dependency can be "correct" and still break your bundler.**
   `react-countup`'s CJS export shape was valid but didn't interop cleanly with
@@ -73,6 +73,6 @@ decisions, and verified functionality by exercising the running app directly.
   already in the project (Framer Motion) was more reliable than fighting an
   external package's build output.
 - **DNS/SRV connection strings are a real deployment gotcha.** A machine that
-  can resolve DNS fine in general can still fail on `mongodb+srv://` lookups;
-  falling back to the standard `mongodb://host1,host2,host3/...` form (built
+  can resolve DNS fine in general can still fail on `mongodb+srv://` lookups.
+  Falling back to the standard `mongodb://host1,host2,host3/...` form (built
   from the SRV/TXT records directly) is a reliable escape hatch.

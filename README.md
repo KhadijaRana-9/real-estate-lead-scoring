@@ -1,14 +1,14 @@
-# DreamHomes — Real-Estate Listings Portal with Lead Scoring
+# DreamHomes: Real-Estate Listings Portal with Lead Scoring
 
 A full-stack real-estate portal: property listings with search/filter, an inquiry
 flow that captures leads, an agent dashboard with analytics, and two "smart"
-logic features — deterministic **lead scoring** and a **price estimator** — both
+logic features: deterministic **lead scoring** and a **price estimator**, both
 explainable rather than black boxes.
 
 ## Live Demo
 
 **App:** https://real-estate-lead-scoring.vercel.app
-(one URL — the frontend transparently proxies `/api/*` to the backend, so there's
+(one URL. The frontend transparently proxies `/api/*` to the backend, so there's
 nothing else to visit)
 
 **Repo:** https://github.com/KhadijaRana-9/real-estate-lead-scoring
@@ -59,7 +59,7 @@ Seeded login (password `Password123!` for all):
             MongoDB
 ```
 
-The backend is organized by **feature**, not by layer — `auth`, `property`,
+The backend is organized by **feature**, not by layer: `auth`, `property`,
 `inquiry`, and `dashboard` each own their model, service, controller and routes.
 Cross-cutting concerns (JWT middleware, role guard, error handler, the scoring
 and pricing utils) live under `shared/`.
@@ -112,12 +112,12 @@ README.md
 ## Lead Scoring Logic
 
 Computed server-side (`server/src/shared/utils/leadScoring.js`) when an inquiry
-is created — deterministic, not random, and the breakdown is stored so the UI
+is created. It's deterministic, not random, and the breakdown is stored so the UI
 can show *why* a lead scored the way it did:
 
 | Factor | Weight | Rule |
 |---|---|---|
-| Budget Match | 0–30 | `30 × max(0, 1 − |budget − price| / price)` — closer to asking price scores higher |
+| Budget Match | 0-30 | `30 × max(0, 1 − |budget − price| / price)`, closer to asking price scores higher |
 | Urgency | 0–25 | immediate=25, 1-3 months=15, 3-6 months=8, exploring=3 |
 | Interest | 0–25 | message length (up to 200 chars → full marks) + bonus for supplying a phone number |
 | Popularity | 0–20 | log-scaled property view count at time of inquiry (repeat interest in a hot listing counts) |

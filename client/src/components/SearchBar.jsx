@@ -20,7 +20,7 @@ export default function SearchBar() {
       <input
         value={city}
         onChange={(e) => setCity(e.target.value)}
-        placeholder="Search by city — e.g. Faisalabad, Islamabad..."
+        placeholder="Search by city, e.g. Faisalabad, Islamabad..."
         className="flex-1 bg-transparent px-2 py-2 text-sm outline-none"
       />
       <button
