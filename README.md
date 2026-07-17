@@ -5,6 +5,19 @@ flow that captures leads, an agent dashboard with analytics, and two "smart"
 logic features — deterministic **lead scoring** and a **price estimator** — both
 explainable rather than black boxes.
 
+## Live Demo
+
+**App:** https://real-estate-lead-scoring.vercel.app
+(one URL — the frontend transparently proxies `/api/*` to the backend, so there's
+nothing else to visit)
+
+**Repo:** https://github.com/KhadijaRana-9/real-estate-lead-scoring
+
+Seeded login (password `Password123!` for all):
+- Admin: `admin@dreamhomes.pk`
+- Agents: `ahmed.agent@dreamhomes.pk`, `sara.agent@dreamhomes.pk`
+- Or sign up as a new customer/agent directly on the site
+
 ## Features
 
 - Property listings: create, edit, delete (agents/admins), browse & search (everyone)
