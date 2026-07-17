@@ -159,11 +159,6 @@ Seeded login (password `Password123!` for all):
 - Admin: `admin@dreamhomes.pk`
 - Agents: `ahmed.agent@dreamhomes.pk`, `sara.agent@dreamhomes.pk`
 
-## Screenshots
-
-_Add screenshots of the homepage, listings/search, property detail + inquiry
-form, and the agent dashboard here before publishing._
-
 ## Future Improvements
 
 - Wishlist / saved properties
