@@ -3,6 +3,7 @@ import { AnimatePresence } from 'framer-motion'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import AnimatedPage from './components/AnimatedPage'
+import ScrollProgressBar from './components/ScrollProgressBar'
 import Home from './pages/Home'
 import Listings from './pages/Listings'
 import PropertyDetail from './pages/PropertyDetail'
@@ -12,13 +13,20 @@ import AgentDashboard from './pages/AgentDashboard'
 import About from './pages/About'
 import NotFound from './pages/NotFound'
 import ProtectedRoute from './components/ProtectedRoute'
+import PlatformLogin from './pages/platform/PlatformLogin'
+import PlatformLayout from './pages/platform/PlatformLayout'
+import PlatformDashboard from './pages/platform/PlatformDashboard'
+import AgencyManagement from './pages/platform/AgencyManagement'
+import AIAssistant from './components/ai/AIAssistant'
 
 export default function App() {
   const location = useLocation()
+  const isPlatformRoute = location.pathname.startsWith('/platform')
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Navbar />
+      <ScrollProgressBar />
+      {!isPlatformRoute && <Navbar />}
       <main className="flex-1">
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
@@ -32,17 +40,32 @@ export default function App() {
               path="/dashboard"
               element={
                 <AnimatedPage>
-                  <ProtectedRoute roles={['agent', 'admin']}>
+                  <ProtectedRoute roles={['agent', 'agency_admin']}>
                     <AgentDashboard />
                   </ProtectedRoute>
                 </AnimatedPage>
               }
             />
+
+            <Route path="/platform/login" element={<PlatformLogin />} />
+            <Route
+              path="/platform"
+              element={
+                <ProtectedRoute roles={['super_admin']} redirectTo="/platform/login">
+                  <PlatformLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<PlatformDashboard />} />
+              <Route path="agencies" element={<AgencyManagement />} />
+            </Route>
+
             <Route path="*" element={<AnimatedPage><NotFound /></AnimatedPage>} />
           </Routes>
         </AnimatePresence>
       </main>
-      <Footer />
+      {!isPlatformRoute && <Footer />}
+      <AIAssistant />
     </div>
   )
 }

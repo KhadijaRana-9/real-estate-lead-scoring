@@ -1,13 +1,38 @@
 const mongoose = require('mongoose');
 
+const ROLES = ['super_admin', 'agency_admin', 'agent', 'customer'];
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
-    role: { type: String, enum: ['admin', 'agent', 'customer'], default: 'customer' },
+    role: { type: String, enum: ROLES, default: 'customer' },
+    // Full invariant now enforced: null only for super_admin, set for
+    // every other role. Safe now that resolveTenant + auth.service.js
+    // populate agencyId on every signup.
+    agencyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Agency',
+      default: null,
+      validate: {
+        validator: function isAgencyIdConsistentWithRole(value) {
+          return this.role === 'super_admin' ? value == null : value != null;
+        },
+        message: 'agencyId must be null for super_admin and set for every other role',
+      },
+    },
   },
   { timestamps: true }
 );
+
+// Email is unique per agency (an agent at Agency A and a customer at
+// Agency B can share an email - they're unrelated accounts), except for
+// super_admin, which has no agency and must be globally unique instead.
+userSchema.index(
+  { agencyId: 1, email: 1 },
+  { unique: true, partialFilterExpression: { agencyId: { $type: 'objectId' } } }
+);
+userSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { role: 'super_admin' } });
 
 module.exports = mongoose.model('User', userSchema);

@@ -3,9 +3,12 @@ const bcrypt = require('bcryptjs');
 
 const loadEnv = require('../config/env');
 const connectDB = require('../config/db');
+const Agency = require('../features/agency/agency.model');
 const User = require('../features/auth/auth.model');
 const Property = require('../features/property/property.model');
 const Inquiry = require('../features/inquiry/inquiry.model');
+
+const SEED_AGENCY_SLUG = 'dreamhomes';
 
 const CITIES = ['Faisalabad', 'Islamabad', 'Lahore', 'Karachi', 'Rawalpindi'];
 const TYPES = ['house', 'flat', 'plot'];
@@ -32,6 +35,22 @@ async function seed() {
   console.log('Clearing existing data...');
   await Promise.all([User.deleteMany({}), Property.deleteMany({}), Inquiry.deleteMany({})]);
 
+  console.log('Ensuring seed Agency exists...');
+  const agency = await Agency.findOneAndUpdate(
+    { slug: SEED_AGENCY_SLUG },
+    {
+      $setOnInsert: {
+        companyName: 'DreamHomes',
+        slug: SEED_AGENCY_SLUG,
+        contactEmail: 'admin@dreamhomes.pk',
+        subscriptionPlan: 'professional',
+        subscriptionStatus: 'active',
+        status: 'active',
+      },
+    },
+    { upsert: true, new: true }
+  );
+
   console.log('Creating users...');
   const passwordHash = await bcrypt.hash('Password123!', 10);
 
@@ -39,12 +58,13 @@ async function seed() {
     name: 'Admin User',
     email: 'admin@dreamhomes.pk',
     passwordHash,
-    role: 'admin',
+    role: 'agency_admin',
+    agencyId: agency._id,
   });
 
   const agents = await User.create([
-    { name: 'Ahmed Raza', email: 'ahmed.agent@dreamhomes.pk', passwordHash, role: 'agent' },
-    { name: 'Sara Khan', email: 'sara.agent@dreamhomes.pk', passwordHash, role: 'agent' },
+    { name: 'Ahmed Raza', email: 'ahmed.agent@dreamhomes.pk', passwordHash, role: 'agent', agencyId: agency._id },
+    { name: 'Sara Khan', email: 'sara.agent@dreamhomes.pk', passwordHash, role: 'agent', agencyId: agency._id },
   ]);
 
   await User.create({
@@ -52,6 +72,7 @@ async function seed() {
     email: 'bilal.customer@dreamhomes.pk',
     passwordHash,
     role: 'customer',
+    agencyId: agency._id,
   });
 
   console.log('Creating properties...');
@@ -80,6 +101,7 @@ async function seed() {
     const price = randomBetween(5, 30) * 1000000;
 
     properties.push({
+      agencyId: agency._id,
       title: titles[i],
       description: `A beautiful ${type} located in ${city}, offering ${area} marla of prime real estate.`,
       price,
@@ -130,6 +152,7 @@ async function seed() {
     });
 
     inquiries.push({
+      agencyId: agency._id,
       property: property._id,
       customer: { name: customer.name, email: customer.email, phone: customer.phone },
       message,

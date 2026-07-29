@@ -1,13 +1,20 @@
 import { motion } from 'framer-motion'
 import CountUpNumber from './CountUpNumber'
 
-export default function StatCard({ label, value, sub, icon }) {
+export default function StatCard({ label, value, sub, icon, onClick }) {
   const isNumber = typeof value === 'number'
+  const clickable = Boolean(onClick)
 
   return (
     <motion.div
-      whileHover={{ y: -3 }}
-      className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+      whileHover={{ y: -3, scale: clickable ? 1.02 : 1 }}
+      onClick={onClick}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } } : undefined}
+      className={`relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900 ${
+        clickable ? 'cursor-pointer hover:border-brand-400 dark:hover:border-brand-500' : ''
+      }`}
     >
       <span className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-brand-400 to-brand-600" />
       <div className="flex items-start justify-between">

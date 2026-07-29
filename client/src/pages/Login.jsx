@@ -1,12 +1,17 @@
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
+import { fadeUp } from '../motion/variants'
+import AmbientBackground from '../components/AmbientBackground'
 
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [shake, setShake] = useState(false)
   const {
     register,
     handleSubmit,
@@ -20,12 +25,20 @@ export default function Login() {
       navigate(location.state?.from || '/')
     } catch (err) {
       toast.error(err.response?.data?.message || 'Login failed')
+      setShake(true)
+      setTimeout(() => setShake(false), 500)
     }
   }
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-md items-center px-4">
-      <div className="w-full rounded-2xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+    <div className="relative mx-auto flex min-h-[70vh] max-w-md items-center px-4">
+      <AmbientBackground />
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={fadeUp}
+        className={`w-full rounded-2xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-900 ${shake ? 'animate-shake' : ''}`}
+      >
         <h1 className="text-2xl font-bold">Welcome back</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Log in to manage your listings and leads.</p>
 
@@ -65,7 +78,7 @@ export default function Login() {
             Sign up
           </Link>
         </p>
-      </div>
+      </motion.div>
     </div>
   )
 }

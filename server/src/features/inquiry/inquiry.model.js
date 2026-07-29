@@ -1,7 +1,10 @@
 const mongoose = require('mongoose');
+const { PIPELINE_STAGES } = require('./pipelineStages');
 
 const inquirySchema = new mongoose.Schema(
   {
+    // Contract step complete - see property.model.js.
+    agencyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agency', required: true, index: true },
     property: { type: mongoose.Schema.Types.ObjectId, ref: 'Property', required: true },
     customer: {
       name: { type: String, required: true, trim: true },
@@ -23,8 +26,19 @@ const inquirySchema = new mongoose.Schema(
       interest: Number,
       popularity: Number,
     },
+    // CRM pipeline stage - independent of the hot/warm/cold score-derived
+    // status above. Score reflects lead quality; pipelineStage reflects
+    // where the agent's own follow-up process actually is.
+    pipelineStage: {
+      type: String,
+      enum: PIPELINE_STAGES,
+      default: 'new',
+    },
   },
   { timestamps: true }
 );
+
+inquirySchema.index({ agencyId: 1, createdAt: -1 });
+inquirySchema.index({ agencyId: 1, property: 1, score: -1 });
 
 module.exports = mongoose.model('Inquiry', inquirySchema);

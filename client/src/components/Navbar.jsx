@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { FiHome, FiSun, FiMoon, FiMenu, FiX } from 'react-icons/fi'
 import { useAuth } from '../context/AuthContext'
 
@@ -30,11 +31,12 @@ function useScrolled() {
 export default function Navbar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [dark, setDark] = useDarkMode()
   const [menuOpen, setMenuOpen] = useState(false)
   const scrolled = useScrolled()
 
-  const isAgentOrAdmin = user && (user.role === 'agent' || user.role === 'admin')
+  const isAgentOrAdmin = user && (user.role === 'agent' || user.role === 'agency_admin')
 
   const navLinks = isAgentOrAdmin
     ? [
@@ -63,15 +65,31 @@ export default function Navbar() {
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2 text-xl font-bold text-brand-600 dark:text-brand-400">
-          <FiHome /> DreamHomes
+          <motion.span
+            animate={{ y: [0, -3, 0] }}
+            transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <FiHome />
+          </motion.span>
+          DreamHomes
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
-          {navLinks.map((link) => (
-            <Link key={link.to} to={link.to} className="hover:text-brand-600 dark:hover:text-brand-400">
-              {link.label}
-            </Link>
-          ))}
+          {navLinks.map((link) => {
+            const isActive = location.pathname === link.to.split('?')[0]
+            return (
+              <Link key={link.to} to={link.to} className="group relative py-1">
+                <span className={isActive ? 'text-brand-600 dark:text-brand-400' : 'group-hover:text-brand-600 dark:group-hover:text-brand-400'}>
+                  {link.label}
+                </span>
+                <span
+                  className={`absolute -bottom-0.5 left-0 h-0.5 w-full origin-left scale-x-0 bg-brand-600 transition-transform duration-200 group-hover:scale-x-100 dark:bg-brand-400 ${
+                    isActive ? 'scale-x-100' : ''
+                  }`}
+                />
+              </Link>
+            )
+          })}
         </nav>
 
         <div className="hidden items-center gap-4 md:flex">
@@ -97,8 +115,14 @@ export default function Navbar() {
               <Link to="/login" className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800">
                 Login
               </Link>
-              <Link to="/signup" className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
-                Sign Up
+              <Link to="/signup">
+                <motion.span
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
+                  className="inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm shadow-brand-600/30 hover:bg-brand-700 hover:shadow-md hover:shadow-brand-600/40"
+                >
+                  Sign Up
+                </motion.span>
               </Link>
             </div>
           )}

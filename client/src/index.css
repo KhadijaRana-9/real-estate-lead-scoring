@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -46,6 +47,24 @@ h1, h2, h3, h4 {
     radial-gradient(circle at 15% 20%, color-mix(in oklab, var(--color-brand-300) 35%, transparent) 0%, transparent 45%),
     radial-gradient(circle at 85% 15%, color-mix(in oklab, #60a5fa 30%, transparent) 0%, transparent 45%),
     radial-gradient(circle at 50% 90%, color-mix(in oklab, var(--color-brand-400) 25%, transparent) 0%, transparent 50%);
+}
+
+@keyframes shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shake,
+  .animate-gradient-mesh {
+    animation: none;
+  }
 }
 
 .dark .hero-mesh {

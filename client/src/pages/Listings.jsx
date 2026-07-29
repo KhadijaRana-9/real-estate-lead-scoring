@@ -7,7 +7,8 @@ import EmptyState from '../components/EmptyState'
 import FilterPanel from '../components/FilterPanel'
 import Pagination from '../components/Pagination'
 
-const EMPTY_FILTERS = { city: '', type: '', minPrice: '', maxPrice: '' }
+const EMPTY_FILTERS = { city: '', type: '', bedrooms: '', minPrice: '', maxPrice: '', sort: '', featured: false }
+const PAGE_SIZE = 12
 
 export default function Listings() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -16,18 +17,21 @@ export default function Listings() {
     city: searchParams.get('city') || '',
   })
   const [page, setPage] = useState(1)
-  const [result, setResult] = useState({ items: [], pagination: { totalPages: 1 } })
+  const [result, setResult] = useState({ items: [], pagination: { totalPages: 1, total: 0 } })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
   const fetchListings = useCallback(() => {
     setLoading(true)
     setError(false)
-    const params = { page, limit: 9 }
+    const params = { page, limit: PAGE_SIZE }
     if (filters.city) params.city = filters.city
     if (filters.type) params.type = filters.type
+    if (filters.bedrooms) params.bedrooms = filters.bedrooms
     if (filters.minPrice) params.minPrice = filters.minPrice
     if (filters.maxPrice) params.maxPrice = filters.maxPrice
+    if (filters.sort) params.sort = filters.sort
+    if (filters.featured) params.featured = true
 
     api
       .getProperties(params)
@@ -54,7 +58,14 @@ export default function Listings() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <h1 className="mb-6 text-2xl font-bold">Properties for Sale</h1>
+      <div className="mb-6 flex items-baseline justify-between">
+        <h1 className="text-2xl font-bold">Properties for Sale</h1>
+        {!loading && !error && (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {result.pagination.total.toLocaleString()} listings found
+          </p>
+        )}
+      </div>
 
       <FilterPanel filters={filters} onChange={handleFilterChange} onClear={clearFilters} />
 
@@ -70,8 +81,8 @@ export default function Listings() {
             }
           />
         ) : loading ? (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 9 }).map((_, i) => <SkeletonCard key={i} />)}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: PAGE_SIZE }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : result.items.length === 0 ? (
           <EmptyState
@@ -85,8 +96,8 @@ export default function Listings() {
           />
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {result.items.map((p) => <PropertyCard key={p._id} property={p} />)}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {result.items.map((p, i) => <PropertyCard key={p._id} property={p} index={i} />)}
             </div>
             <Pagination page={page} totalPages={result.pagination.totalPages} onChange={setPage} />
           </>

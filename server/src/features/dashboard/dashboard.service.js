@@ -1,26 +1,27 @@
-const Property = require('../property/property.model');
-const Inquiry = require('../inquiry/inquiry.model');
+const propertyRepository = require('../property/property.repository');
+const inquiryRepository = require('../inquiry/inquiry.repository');
 const User = require('../auth/auth.model');
+const { buildMonthlyTrend } = require('../../shared/utils/monthlyTrend');
 
-async function getPublicStats() {
+async function getPublicStats(tenantId) {
   const [properties, cities, agents] = await Promise.all([
-    Property.countDocuments({ status: 'available' }),
-    Property.distinct('city'),
-    User.countDocuments({ role: 'agent' }),
+    propertyRepository.countDocuments(tenantId, { status: 'available' }),
+    propertyRepository.distinctCities(tenantId),
+    User.countDocuments({ agencyId: tenantId, role: 'agent' }),
   ]);
 
   return { properties, cities: cities.length, agents };
 }
 
-async function getSummary(requester) {
-  const propertyFilter = requester.role === 'admin' ? {} : { agent: requester.id };
-  const properties = await Property.find(propertyFilter).select('_id title views');
+async function getSummary(tenantId, requester) {
+  const propertyFilter = requester.role === 'agency_admin' ? {} : { agent: requester.id };
+  const properties = await propertyRepository.find(tenantId, propertyFilter).select('_id title views');
   const propertyIds = properties.map((p) => p._id);
 
   const [totalProperties, totalInquiries, inquiries] = await Promise.all([
-    Property.countDocuments(propertyFilter),
-    Inquiry.countDocuments({ property: { $in: propertyIds } }),
-    Inquiry.find({ property: { $in: propertyIds } }).select('score status property createdAt'),
+    propertyRepository.countDocuments(tenantId, propertyFilter),
+    inquiryRepository.countDocuments(tenantId, { property: { $in: propertyIds } }),
+    inquiryRepository.find(tenantId, { property: { $in: propertyIds } }).select('score status property createdAt'),
   ]);
 
   const hotLeads = inquiries.filter((i) => i.status === 'hot').length;
@@ -52,7 +53,7 @@ async function getSummary(requester) {
 
   let highestScoringLead = null;
   if (topInquiry) {
-    const inquiryWithLead = await Inquiry.findById(topInquiry._id).select('customer score');
+    const inquiryWithLead = await inquiryRepository.findById(tenantId, topInquiry._id).select('customer score');
     highestScoringLead = { name: inquiryWithLead.customer.name, score: inquiryWithLead.score };
   }
 
@@ -71,18 +72,6 @@ async function getSummary(requester) {
       topProperties,
     },
   };
-}
-
-function buildMonthlyTrend(inquiries) {
-  const buckets = new Map();
-  for (const inquiry of inquiries) {
-    const date = new Date(inquiry.createdAt);
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    buckets.set(key, (buckets.get(key) || 0) + 1);
-  }
-  return Array.from(buckets.entries())
-    .sort(([a], [b]) => (a > b ? 1 : -1))
-    .map(([month, count]) => ({ month, count }));
 }
 
 module.exports = { getSummary, getPublicStats };

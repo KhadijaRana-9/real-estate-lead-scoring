@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback } from 'react'
 import * as api from '../api/endpoints'
+import { setSession, clearSession, getRefreshToken } from '../api/axios'
 
 const AuthContext = createContext(null)
 
@@ -15,32 +16,43 @@ function readStoredUser() {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(readStoredUser)
 
-  const persist = (token, user) => {
-    localStorage.setItem('token', token)
+  const persist = (accessToken, refreshToken, user) => {
+    setSession(accessToken, refreshToken)
     localStorage.setItem('user', JSON.stringify(user))
     setUser(user)
   }
 
   const login = useCallback(async (credentials) => {
     const { data } = await api.login(credentials)
-    persist(data.token, data.user)
+    persist(data.accessToken, data.refreshToken, data.user)
     return data.user
   }, [])
 
   const signup = useCallback(async (payload) => {
     const { data } = await api.signup(payload)
-    persist(data.token, data.user)
+    persist(data.accessToken, data.refreshToken, data.user)
+    return data.user
+  }, [])
+
+  const platformLogin = useCallback(async (credentials) => {
+    const { data } = await api.platformLogin(credentials)
+    persist(data.accessToken, data.refreshToken, data.user)
     return data.user
   }, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    const refreshToken = getRefreshToken()
+    clearSession()
     setUser(null)
+    // Best-effort server-side revocation; the client-side session is
+    // already cleared regardless of whether this call succeeds.
+    if (refreshToken) {
+      api.logout({ refreshToken }).catch(() => {})
+    }
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, login, signup, platformLogin, logout }}>
       {children}
     </AuthContext.Provider>
   )

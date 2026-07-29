@@ -7,6 +7,13 @@ export const STATUS_COLORS = {
 export const SEQUENTIAL_BLUE = { light: '#2a78d6', dark: '#3987e5' }
 export const SEQUENTIAL_AQUA = { light: '#1baf7a', dark: '#199e70' }
 
+export const CATEGORICAL_PALETTE = [
+  { light: '#6d5ce7', dark: '#8b7ff2' },
+  { light: '#2a78d6', dark: '#3987e5' },
+  { light: '#1baf7a', dark: '#199e70' },
+  { light: '#eb6834', dark: '#d95926' },
+]
+
 export const CHART_INK = {
   primary: { light: '#0b0b0b', dark: '#ffffff' },
   secondary: { light: '#52514e', dark: '#c3c2b7' },
