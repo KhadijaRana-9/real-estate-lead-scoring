@@ -22,7 +22,7 @@ function incrementViewsById(tenantId, id) {
     { _id: id, agencyId: tenantId },
     { $inc: { views: 1 } },
     { new: true }
-  );
+  ).populate('agent', 'name email phone whatsapp avatar');
 }
 
 function create(tenantId, data) {

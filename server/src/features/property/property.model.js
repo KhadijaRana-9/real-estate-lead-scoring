@@ -1,5 +1,65 @@
 const mongoose = require('mongoose');
 
+// Room/area categories a property's media can be organized under. 'other'
+// is the catch-all for anything that doesn't fit, and is also what
+// pre-existing flat images/videos get migrated into (see
+// src/migrations/002_categorize_media.js) since there's no way to know
+// which room an old, uncategorized photo actually shows.
+const MEDIA_CATEGORIES = [
+  'exterior',
+  'living_room',
+  'kitchen',
+  'master_bedroom',
+  'bedroom_2',
+  'bedroom_3',
+  'bathrooms',
+  'dining_room',
+  'tv_lounge',
+  'office_room',
+  'study_room',
+  'gym',
+  'swimming_pool',
+  'garden',
+  'garage',
+  'terrace',
+  'basement',
+  'balcony',
+  'other',
+];
+
+const MEDIA_PROVIDERS = ['local', 'cloudinary', 's3', 'url', 'google_drive', 'dropbox', 'onedrive'];
+
+const mediaImageSchema = new mongoose.Schema(
+  {
+    url: { type: String, required: true },
+    thumbnail: { type: String, default: '' },
+    caption: { type: String, trim: true, default: '', maxlength: 300 },
+    category: { type: String, enum: MEDIA_CATEGORIES, default: 'other' },
+    width: { type: Number, default: null },
+    height: { type: Number, default: null },
+    provider: { type: String, enum: MEDIA_PROVIDERS, default: 'local' },
+    isCover: { type: Boolean, default: false },
+    order: { type: Number, default: 0 },
+    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+
+const mediaVideoSchema = new mongoose.Schema(
+  {
+    url: { type: String, required: true },
+    thumbnail: { type: String, default: '' },
+    title: { type: String, trim: true, default: '', maxlength: 200 },
+    caption: { type: String, trim: true, default: '', maxlength: 300 },
+    duration: { type: Number, default: null }, // seconds, when known
+    category: { type: String, enum: MEDIA_CATEGORIES, default: 'other' },
+    provider: { type: String, enum: MEDIA_PROVIDERS, default: 'local' },
+    order: { type: Number, default: 0 },
+    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+
 const propertySchema = new mongoose.Schema(
   {
     // Contract step complete: every write path (property.repository.js,
@@ -35,8 +95,20 @@ const propertySchema = new mongoose.Schema(
       lat: { type: Number, min: -90, max: 90 },
       lng: { type: Number, min: -180, max: 180 },
     },
+    // Legacy flat mirrors - kept in sync by property.service.js's media
+    // functions (syncFlatMediaArrays) every time `media` changes below.
+    // Every existing reader (PropertyCard, Home, Listings, AI tools,
+    // dashboards) keeps working unchanged; new categorized UI reads/
+    // writes `media` directly. Cover image is always images[0].
     images: { type: [String], default: [] },
     videos: { type: [String], default: [] },
+    // The real, categorized media record - see mediaImageSchema/
+    // mediaVideoSchema above. Source of truth; `images`/`videos` above
+    // are derived from this.
+    media: {
+      images: { type: [mediaImageSchema], default: [] },
+      videos: { type: [mediaVideoSchema], default: [] },
+    },
     virtualTourUrl: { type: String, trim: true, default: '' },
     documents: {
       type: [
@@ -69,3 +141,5 @@ propertySchema.index({ agencyId: 1, status: 1, city: 1, price: 1, type: 1 });
 propertySchema.index({ agencyId: 1, status: 1, featured: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Property', propertySchema);
+module.exports.MEDIA_CATEGORIES = MEDIA_CATEGORIES;
+module.exports.MEDIA_PROVIDERS = MEDIA_PROVIDERS;

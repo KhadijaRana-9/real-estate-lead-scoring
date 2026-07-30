@@ -7,7 +7,7 @@ const authController = require('../auth/auth.controller');
 const { loginSchema } = require('../auth/auth.schema');
 const agenciesController = require('./agencies.controller');
 const dashboardController = require('./dashboard.controller');
-const { createAgencySchema, listAgenciesQuerySchema, agencyIdParamSchema } = require('./agencies.schema');
+const { createAgencySchema, listAgenciesQuerySchema, agencyIdParamSchema, setVerifiedSchema, setFeaturedSchema } = require('./agencies.schema');
 
 const router = express.Router();
 
@@ -24,6 +24,8 @@ router.get('/agencies', validate(listAgenciesQuerySchema), agenciesController.li
 router.post('/agencies', validate(createAgencySchema), agenciesController.create);
 router.patch('/agencies/:id/suspend', validate(agencyIdParamSchema), agenciesController.suspend);
 router.patch('/agencies/:id/reactivate', validate(agencyIdParamSchema), agenciesController.reactivate);
+router.patch('/agencies/:id/verified', validate(setVerifiedSchema), agenciesController.setVerified);
+router.patch('/agencies/:id/featured', validate(setFeaturedSchema), agenciesController.setFeatured);
 router.delete('/agencies/:id', validate(agencyIdParamSchema), agenciesController.remove);
 
 router.get('/dashboard/summary', dashboardController.summary);

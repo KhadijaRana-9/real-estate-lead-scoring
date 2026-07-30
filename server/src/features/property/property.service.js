@@ -1,4 +1,5 @@
 const propertyRepository = require('./property.repository');
+const Agency = require('../agency/agency.model');
 const { estimatePrice } = require('../../shared/utils/priceEstimate');
 const { pickAllowedFields } = require('../../shared/utils/whitelist');
 const { escapeRegExp } = require('../../shared/utils/regex');
@@ -58,6 +59,8 @@ async function listProperties(tenantId, query) {
     category,
     bedrooms,
     featured,
+    agent,
+    excludeId,
     sort,
     page = 1,
     limit = DEFAULT_PAGE_SIZE,
@@ -70,6 +73,8 @@ async function listProperties(tenantId, query) {
   if (category) filter.category = category;
   if (bedrooms) filter.bedrooms = { $gte: Number(bedrooms) };
   if (featured !== undefined) filter.featured = featured;
+  if (agent) filter.agent = agent;
+  if (excludeId) filter._id = { $ne: excludeId };
   if (minPrice || maxPrice) {
     filter.price = {};
     if (minPrice) filter.price.$gte = Number(minPrice);
@@ -120,6 +125,14 @@ function assertOwnership(property, requester, message) {
   }
 }
 
+// Real join, not a fabricated card - the same Agency doc the marketplace
+// profile page reads from, trimmed to what a property detail page's
+// "Listing Agency" card actually needs.
+async function attachAgencySummary(tenantId, property) {
+  const agency = await Agency.findById(tenantId).select('companyName slug logo phone whatsapp contactEmail verified subscriptionPlan city');
+  return { ...property.toObject(), agency };
+}
+
 async function getPropertyById(tenantId, id) {
   const property = await propertyRepository.incrementViewsById(tenantId, id);
   // Drafts are never publicly visible, even to someone who has/guesses
@@ -129,7 +142,7 @@ async function getPropertyById(tenantId, id) {
   if (!property || property.status === 'draft') {
     throw notFound();
   }
-  return property;
+  return attachAgencySummary(tenantId, property);
 }
 
 async function createProperty(tenantId, data, requester) {
@@ -203,6 +216,158 @@ function getPriceEstimate(data) {
   return estimatePrice(data);
 }
 
+// Keeps the legacy flat images[]/videos[] string arrays equal to
+// media.images/media.videos (ordered, cover-first) every time media
+// changes - the single place this sync happens, so every existing
+// consumer of the flat arrays (PropertyCard, Home, Listings, AI tools,
+// dashboards) keeps working without being rewritten.
+function syncFlatMediaArrays(property) {
+  const sortedImages = [...property.media.images].sort((a, b) => {
+    if (a.isCover !== b.isCover) return a.isCover ? -1 : 1;
+    return a.order - b.order;
+  });
+  property.images = sortedImages.map((img) => img.url);
+  property.videos = [...property.media.videos].sort((a, b) => a.order - b.order).map((v) => v.url);
+}
+
+async function loadOwnedProperty(tenantId, id, requester, message) {
+  const property = await propertyRepository.findById(tenantId, id);
+  if (!property) throw notFound();
+  assertOwnership(property, requester, message);
+  return property;
+}
+
+// items: [{ url, thumbnail, caption, width, height, provider }]
+async function addMediaImages(tenantId, id, requester, category, items) {
+  const property = await loadOwnedProperty(tenantId, id, requester, 'You can only edit your own listings');
+
+  const hasCoverAlready = property.media.images.some((img) => img.isCover);
+  const startOrder = property.media.images.length;
+  const newImages = items.map((item, i) => ({
+    url: item.url,
+    thumbnail: item.thumbnail || '',
+    caption: item.caption || '',
+    category,
+    width: item.width ?? null,
+    height: item.height ?? null,
+    provider: item.provider || 'local',
+    isCover: !hasCoverAlready && i === 0 && property.media.images.length === 0,
+    order: startOrder + i,
+    uploadedBy: requester.id,
+  }));
+
+  property.media.images.push(...newImages);
+  syncFlatMediaArrays(property);
+  await property.save();
+  auditLog.record({ tenantId, actor: requester, action: 'property.media.add_images', targetType: 'Property', targetId: property._id, metadata: { category, count: items.length } });
+  return property;
+}
+
+// items: [{ url, thumbnail, title, caption, duration, provider }]
+async function addMediaVideos(tenantId, id, requester, category, items) {
+  const property = await loadOwnedProperty(tenantId, id, requester, 'You can only edit your own listings');
+
+  const startOrder = property.media.videos.length;
+  const newVideos = items.map((item, i) => ({
+    url: item.url,
+    thumbnail: item.thumbnail || '',
+    title: item.title || '',
+    caption: item.caption || '',
+    duration: item.duration ?? null,
+    category,
+    provider: item.provider || 'local',
+    order: startOrder + i,
+    uploadedBy: requester.id,
+  }));
+
+  property.media.videos.push(...newVideos);
+  syncFlatMediaArrays(property);
+  await property.save();
+  auditLog.record({ tenantId, actor: requester, action: 'property.media.add_videos', targetType: 'Property', targetId: property._id, metadata: { category, count: items.length } });
+  return property;
+}
+
+function mediaNotFound() {
+  const err = new Error('Media item not found');
+  err.status = 404;
+  return err;
+}
+
+const EDITABLE_MEDIA_FIELDS = {
+  image: ['caption', 'category'],
+  video: ['caption', 'category', 'title'],
+};
+
+async function updateMediaItem(tenantId, id, requester, type, mediaId, data) {
+  const property = await loadOwnedProperty(tenantId, id, requester, 'You can only edit your own listings');
+  const list = type === 'image' ? property.media.images : property.media.videos;
+  const item = list.id(mediaId);
+  if (!item) throw mediaNotFound();
+
+  for (const field of EDITABLE_MEDIA_FIELDS[type]) {
+    if (data[field] !== undefined) item[field] = data[field];
+  }
+  await property.save();
+  return property;
+}
+
+async function deleteMediaItem(tenantId, id, requester, type, mediaId) {
+  const property = await loadOwnedProperty(tenantId, id, requester, 'You can only edit your own listings');
+  const list = type === 'image' ? property.media.images : property.media.videos;
+  const item = list.id(mediaId);
+  if (!item) throw mediaNotFound();
+
+  const wasCover = type === 'image' && item.isCover;
+  item.deleteOne();
+
+  // Promote the next image to cover so a property never ends up with
+  // zero cover images while it still has photos.
+  if (wasCover && property.media.images.length > 0) {
+    property.media.images.sort((a, b) => a.order - b.order)[0].isCover = true;
+  }
+
+  syncFlatMediaArrays(property);
+  await property.save();
+  auditLog.record({ tenantId, actor: requester, action: 'property.media.delete', targetType: 'Property', targetId: property._id, metadata: { type, mediaId } });
+  return property;
+}
+
+// orderedIds: every media id in this category, in the desired order.
+async function reorderMediaCategory(tenantId, id, requester, type, category, orderedIds) {
+  const property = await loadOwnedProperty(tenantId, id, requester, 'You can only edit your own listings');
+  const list = type === 'image' ? property.media.images : property.media.videos;
+
+  const orderIndex = new Map(orderedIds.map((mediaId, i) => [mediaId, i]));
+  let changed = false;
+  for (const item of list) {
+    if (item.category !== category) continue;
+    const newOrder = orderIndex.get(item._id.toString());
+    if (newOrder !== undefined && item.order !== newOrder) {
+      item.order = newOrder;
+      changed = true;
+    }
+  }
+  if (!changed) return property;
+
+  syncFlatMediaArrays(property);
+  await property.save();
+  return property;
+}
+
+async function setCoverImage(tenantId, id, requester, mediaId) {
+  const property = await loadOwnedProperty(tenantId, id, requester, 'You can only edit your own listings');
+  const target = property.media.images.id(mediaId);
+  if (!target) throw mediaNotFound();
+
+  property.media.images.forEach((img) => {
+    img.isCover = img._id.toString() === mediaId;
+  });
+
+  syncFlatMediaArrays(property);
+  await property.save();
+  return property;
+}
+
 // Tenant-scoped, ownership-respecting comparison of up to 5 properties
 // side by side - real documents only, 404s (not silently drops) any id
 // that doesn't belong to this tenant.
@@ -269,4 +434,10 @@ module.exports = {
   compareProperties,
   recommendProperties,
   getAnalytics,
+  addMediaImages,
+  addMediaVideos,
+  updateMediaItem,
+  deleteMediaItem,
+  reorderMediaCategory,
+  setCoverImage,
 };

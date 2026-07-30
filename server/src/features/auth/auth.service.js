@@ -183,10 +183,29 @@ async function revokeSessionById(userId, sessionId) {
   }
 }
 
+async function getProfile(userId) {
+  const user = await User.findById(userId).select('-passwordHash');
+  if (!user) throw unauthorized('User not found');
+  return user;
+}
+
+async function updateProfile(userId, data) {
+  const user = await User.findById(userId);
+  if (!user) throw unauthorized('User not found');
+
+  if (data.phone !== undefined) user.phone = data.phone;
+  if (data.whatsapp !== undefined) user.whatsapp = data.whatsapp;
+  if (data.avatar !== undefined) user.avatar = data.avatar;
+  await user.save();
+  return user;
+}
+
 module.exports = {
   signup,
   login,
   platformLogin,
+  getProfile,
+  updateProfile,
   signAccessToken,
   issueRefreshToken,
   rotateRefreshToken,

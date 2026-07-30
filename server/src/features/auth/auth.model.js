@@ -8,6 +8,13 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ROLES, default: 'customer' },
+    // Agent-facing contact info, surfaced on Property Details "Call
+    // Agent"/"WhatsApp" buttons. Optional - empty until an agent fills
+    // it in; the frontend falls back to the agency's contact info
+    // rather than showing a broken button when absent.
+    phone: { type: String, trim: true, default: '' },
+    whatsapp: { type: String, trim: true, default: '' },
+    avatar: { type: String, trim: true, default: '' },
     // Full invariant now enforced: null only for super_admin, set for
     // every other role. Safe now that resolveTenant + auth.service.js
     // populate agencyId on every signup.

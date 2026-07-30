@@ -8,6 +8,7 @@ const inquiryRoutes = require('./features/inquiry/inquiry.routes');
 const dashboardRoutes = require('./features/dashboard/dashboard.routes');
 const platformRoutes = require('./features/platform/platform.routes');
 const agencyRoutes = require('./features/agency/agency.routes');
+const marketplaceRoutes = require('./features/marketplace/marketplace.routes');
 const aiRoutes = require('./features/ai/ai.routes');
 const uploadsRoutes = require('./features/uploads/uploads.routes');
 const crmRoutes = require('./features/crm/crm.routes');
@@ -49,6 +50,7 @@ function createApp(env) {
   app.use('/api/billing', billingRoutes);
   app.use('/api/reports', reportsRoutes);
   app.use('/api/agency', agencyRoutes);
+  app.use('/api/agencies', marketplaceRoutes);
   app.use('/api/audit', auditRoutes);
 
   app.use(notFound);

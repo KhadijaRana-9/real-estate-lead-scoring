@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { MEDIA_CATEGORIES, MEDIA_PROVIDERS } = require('./property.model');
 
 const objectIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
 
@@ -92,6 +93,8 @@ const listPropertiesQuerySchema = {
     category: z.enum(PROPERTY_CATEGORIES).optional(),
     bedrooms: z.coerce.number().int().nonnegative().optional(),
     featured: z.coerce.boolean().optional(),
+    agent: objectIdSchema.optional(),
+    excludeId: objectIdSchema.optional(),
     sort: z.enum(SORT_OPTIONS).optional(),
     page: z.coerce.number().int().positive().optional(),
     limit: z.coerce.number().int().positive().max(50).optional(),
@@ -116,6 +119,63 @@ const compareQuerySchema = {
   }),
 };
 
+const mediaImageItemSchema = z.object({
+  url: z.string().trim().url(),
+  thumbnail: z.string().trim().url().optional(),
+  caption: z.string().trim().max(300).optional(),
+  width: z.coerce.number().positive().optional(),
+  height: z.coerce.number().positive().optional(),
+  provider: z.enum(MEDIA_PROVIDERS).optional(),
+});
+
+const mediaVideoItemSchema = z.object({
+  url: z.string().trim().url(),
+  thumbnail: z.string().trim().url().optional(),
+  title: z.string().trim().max(200).optional(),
+  caption: z.string().trim().max(300).optional(),
+  duration: z.coerce.number().positive().optional(),
+  provider: z.enum(MEDIA_PROVIDERS).optional(),
+});
+
+const addMediaImagesSchema = {
+  params: idParamSchema.params,
+  body: z.object({
+    category: z.enum(MEDIA_CATEGORIES),
+    items: z.array(mediaImageItemSchema).min(1).max(50),
+  }),
+};
+
+const addMediaVideosSchema = {
+  params: idParamSchema.params,
+  body: z.object({
+    category: z.enum(MEDIA_CATEGORIES),
+    items: z.array(mediaVideoItemSchema).min(1).max(20),
+  }),
+};
+
+const mediaIdParamSchema = {
+  params: z.object({ id: objectIdSchema, mediaId: objectIdSchema }),
+};
+
+const updateMediaItemSchema = {
+  params: mediaIdParamSchema.params,
+  body: z
+    .object({
+      caption: z.string().trim().max(300).optional(),
+      category: z.enum(MEDIA_CATEGORIES).optional(),
+      title: z.string().trim().max(200).optional(),
+    })
+    .refine((data) => Object.keys(data).length > 0, { message: 'At least one field is required' }),
+};
+
+const reorderMediaSchema = {
+  params: idParamSchema.params,
+  body: z.object({
+    category: z.enum(MEDIA_CATEGORIES),
+    orderedIds: z.array(objectIdSchema).min(1).max(200),
+  }),
+};
+
 module.exports = {
   createPropertySchema,
   draftPropertySchema,
@@ -124,4 +184,10 @@ module.exports = {
   listPropertiesQuerySchema,
   estimatePriceSchema,
   compareQuerySchema,
+  addMediaImagesSchema,
+  addMediaVideosSchema,
+  mediaIdParamSchema,
+  updateMediaItemSchema,
+  reorderMediaSchema,
+  MEDIA_CATEGORIES,
 };

@@ -5,7 +5,7 @@ const requireRole = require('../../shared/middleware/role');
 const validate = require('../../shared/middleware/validate');
 const { authLimiter } = require('../../shared/middleware/rateLimiters');
 const controller = require('./agency.controller');
-const { inviteUserSchema, idParamSchema, acceptInviteSchema, updateBrandingSchema } = require('./agency.schema');
+const { inviteUserSchema, idParamSchema, acceptInviteSchema, updateBrandingSchema, updateProfileSchema } = require('./agency.schema');
 
 const router = express.Router();
 
@@ -19,6 +19,8 @@ router.use(auth, resolveTenant(), requireRole('agency_admin'));
 router.get('/performance', controller.getPerformance);
 router.get('/branding', controller.getBranding);
 router.patch('/branding', validate(updateBrandingSchema), controller.updateBranding);
+router.get('/profile', controller.getProfile);
+router.patch('/profile', validate(updateProfileSchema), controller.updateProfile);
 router.post('/invites', validate(inviteUserSchema), controller.inviteUser);
 router.get('/invites', controller.listInvites);
 router.delete('/invites/:id', validate(idParamSchema), controller.revokeInvite);

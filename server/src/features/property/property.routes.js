@@ -12,6 +12,11 @@ const {
   listPropertiesQuerySchema,
   estimatePriceSchema,
   compareQuerySchema,
+  addMediaImagesSchema,
+  addMediaVideosSchema,
+  mediaIdParamSchema,
+  updateMediaItemSchema,
+  reorderMediaSchema,
 } = require('./property.schema');
 
 const router = express.Router();
@@ -82,5 +87,22 @@ router.patch(
   validate(idParamSchema),
   controller.publish
 );
+
+// Categorized media management (wizard's Media Manager + property owner
+// edits) - see property.service.js's addMediaImages/addMediaVideos/etc.
+// and property.model.js's MEDIA_CATEGORIES for the 19 room categories.
+const mediaAuth = [auth, resolveTenant(), requireRole('agent', 'agency_admin')];
+
+router.post('/:id/media/images', ...mediaAuth, validate(addMediaImagesSchema), controller.addMediaImages);
+router.post('/:id/media/videos', ...mediaAuth, validate(addMediaVideosSchema), controller.addMediaVideos);
+// /reorder must stay registered before the /:mediaId routes below -
+// otherwise Express matches "reorder" itself as a :mediaId value.
+router.patch('/:id/media/images/reorder', ...mediaAuth, validate(reorderMediaSchema), controller.reorderMediaImages);
+router.patch('/:id/media/videos/reorder', ...mediaAuth, validate(reorderMediaSchema), controller.reorderMediaVideos);
+router.patch('/:id/media/images/:mediaId/cover', ...mediaAuth, validate(mediaIdParamSchema), controller.setCoverImage);
+router.patch('/:id/media/images/:mediaId', ...mediaAuth, validate(updateMediaItemSchema), controller.updateMediaImage);
+router.patch('/:id/media/videos/:mediaId', ...mediaAuth, validate(updateMediaItemSchema), controller.updateMediaVideo);
+router.delete('/:id/media/images/:mediaId', ...mediaAuth, validate(mediaIdParamSchema), controller.deleteMediaImage);
+router.delete('/:id/media/videos/:mediaId', ...mediaAuth, validate(mediaIdParamSchema), controller.deleteMediaVideo);
 
 module.exports = router;

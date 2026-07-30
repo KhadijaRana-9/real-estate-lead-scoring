@@ -10,6 +10,7 @@
     "seed": "node src/seed/seed.js",
     "seed:large": "node src/seed/seedProperties.js",
     "migrate:agencies": "node src/migrations/001_introduce_agencies.js",
+    "migrate:media": "node src/migrations/002_categorize_media.js",
     "provision:super-admin": "node src/scripts/provision-super-admin.js",
     "lint": "oxlint",
     "test": "jest",

@@ -68,6 +68,24 @@ async function reactivateAgency(id, requester) {
   return agency;
 }
 
+async function setVerified(id, verified, requester) {
+  const agency = await Agency.findById(id);
+  if (!agency) throw notFound();
+  agency.verified = Boolean(verified);
+  await agency.save();
+  auditLog.record({ tenantId: null, actor: requester, action: 'agency.set_verified', targetType: 'Agency', targetId: agency._id, metadata: { verified: agency.verified } });
+  return agency;
+}
+
+async function setFeatured(id, featured, requester) {
+  const agency = await Agency.findById(id);
+  if (!agency) throw notFound();
+  agency.featured = Boolean(featured);
+  await agency.save();
+  auditLog.record({ tenantId: null, actor: requester, action: 'agency.set_featured', targetType: 'Agency', targetId: agency._id, metadata: { featured: agency.featured } });
+  return agency;
+}
+
 async function deleteAgency(id) {
   const agency = await Agency.findById(id);
   if (!agency) throw notFound();
@@ -85,4 +103,4 @@ async function deleteAgency(id) {
   await agency.deleteOne();
 }
 
-module.exports = { listAgencies, createAgency, suspendAgency, reactivateAgency, deleteAgency };
+module.exports = { listAgencies, createAgency, suspendAgency, reactivateAgency, setVerified, setFeatured, deleteAgency };

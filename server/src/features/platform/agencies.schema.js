@@ -38,4 +38,14 @@ const agencyIdParamSchema = {
   params: z.object({ id: objectIdSchema }),
 };
 
-module.exports = { createAgencySchema, listAgenciesQuerySchema, agencyIdParamSchema };
+const setVerifiedSchema = {
+  params: agencyIdParamSchema.params,
+  body: z.object({ verified: z.coerce.boolean() }),
+};
+
+const setFeaturedSchema = {
+  params: agencyIdParamSchema.params,
+  body: z.object({ featured: z.coerce.boolean() }),
+};
+
+module.exports = { createAgencySchema, listAgenciesQuerySchema, agencyIdParamSchema, setVerifiedSchema, setFeaturedSchema };

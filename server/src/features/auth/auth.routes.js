@@ -4,7 +4,7 @@ const auth = require('../../shared/middleware/auth');
 const validate = require('../../shared/middleware/validate');
 const resolveTenant = require('../../shared/middleware/resolveTenant');
 const { authLimiter } = require('../../shared/middleware/rateLimiters');
-const { signupSchema, loginSchema, refreshSchema, logoutSchema } = require('./auth.schema');
+const { signupSchema, loginSchema, refreshSchema, logoutSchema, updateMeSchema } = require('./auth.schema');
 
 const router = express.Router();
 
@@ -17,6 +17,7 @@ router.post('/refresh', authLimiter, validate(refreshSchema), controller.refresh
 router.post('/logout', validate(logoutSchema), controller.logout);
 
 router.get('/me', auth, controller.me);
+router.patch('/me', auth, validate(updateMeSchema), controller.updateMe);
 router.get('/sessions', auth, controller.sessions);
 router.delete('/sessions/:id', auth, controller.revokeSession);
 

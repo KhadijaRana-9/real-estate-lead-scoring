@@ -1,7 +1,16 @@
 const authService = require('./auth.service');
 
 function toPublicUser(user) {
-  return { id: user._id, name: user.name, email: user.email, role: user.role, agencyId: user.agencyId };
+  return {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    agencyId: user.agencyId,
+    phone: user.phone,
+    whatsapp: user.whatsapp,
+    avatar: user.avatar,
+  };
 }
 
 async function signup(req, res, next) {
@@ -81,8 +90,22 @@ async function revokeSession(req, res, next) {
   }
 }
 
-function me(req, res) {
-  res.json(req.user);
+async function me(req, res, next) {
+  try {
+    const user = await authService.getProfile(req.user.id);
+    res.json(toPublicUser(user));
+  } catch (err) {
+    next(err);
+  }
 }
 
-module.exports = { signup, login, platformLogin, refresh, logout, sessions, revokeSession, me };
+async function updateMe(req, res, next) {
+  try {
+    const user = await authService.updateProfile(req.user.id, req.body);
+    res.json(toPublicUser(user));
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { signup, login, platformLogin, refresh, logout, sessions, revokeSession, me, updateMe };

@@ -111,6 +111,87 @@ async function recommendations(req, res, next) {
   }
 }
 
+async function addMediaImages(req, res, next) {
+  try {
+    const property = await propertyService.addMediaImages(req.tenant._id, req.params.id, req.user, req.body.category, req.body.items);
+    res.status(201).json(property);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function addMediaVideos(req, res, next) {
+  try {
+    const property = await propertyService.addMediaVideos(req.tenant._id, req.params.id, req.user, req.body.category, req.body.items);
+    res.status(201).json(property);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateMediaImage(req, res, next) {
+  try {
+    const property = await propertyService.updateMediaItem(req.tenant._id, req.params.id, req.user, 'image', req.params.mediaId, req.body);
+    res.json(property);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateMediaVideo(req, res, next) {
+  try {
+    const property = await propertyService.updateMediaItem(req.tenant._id, req.params.id, req.user, 'video', req.params.mediaId, req.body);
+    res.json(property);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function deleteMediaImage(req, res, next) {
+  try {
+    const property = await propertyService.deleteMediaItem(req.tenant._id, req.params.id, req.user, 'image', req.params.mediaId);
+    res.json(property);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function deleteMediaVideo(req, res, next) {
+  try {
+    const property = await propertyService.deleteMediaItem(req.tenant._id, req.params.id, req.user, 'video', req.params.mediaId);
+    res.json(property);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function reorderMediaImages(req, res, next) {
+  try {
+    const property = await propertyService.reorderMediaCategory(req.tenant._id, req.params.id, req.user, 'image', req.body.category, req.body.orderedIds);
+    res.json(property);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function reorderMediaVideos(req, res, next) {
+  try {
+    const property = await propertyService.reorderMediaCategory(req.tenant._id, req.params.id, req.user, 'video', req.body.category, req.body.orderedIds);
+    res.json(property);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function setCoverImage(req, res, next) {
+  try {
+    const property = await propertyService.setCoverImage(req.tenant._id, req.params.id, req.user, req.params.mediaId);
+    res.json(property);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   list,
   listMine,
@@ -124,4 +205,13 @@ module.exports = {
   compare,
   analytics,
   recommendations,
+  addMediaImages,
+  addMediaVideos,
+  updateMediaImage,
+  updateMediaVideo,
+  deleteMediaImage,
+  deleteMediaVideo,
+  reorderMediaImages,
+  reorderMediaVideos,
+  setCoverImage,
 };

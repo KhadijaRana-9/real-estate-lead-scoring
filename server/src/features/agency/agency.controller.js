@@ -28,6 +28,24 @@ async function updateBranding(req, res, next) {
   }
 }
 
+async function getProfile(req, res, next) {
+  try {
+    const result = await agencyService.getProfile(req.tenant._id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateProfile(req, res, next) {
+  try {
+    const result = await agencyService.updateProfile(req.tenant._id, req.user, req.body);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function inviteUser(req, res, next) {
   try {
     const result = await agencyService.inviteUser(req.tenant._id, req.user, req.body);
@@ -72,4 +90,4 @@ async function acceptInvite(req, res, next) {
   }
 }
 
-module.exports = { getPerformance, getBranding, updateBranding, inviteUser, listInvites, revokeInvite, acceptInvite };
+module.exports = { getPerformance, getBranding, getProfile, updateBranding, updateProfile, inviteUser, listInvites, revokeInvite, acceptInvite };

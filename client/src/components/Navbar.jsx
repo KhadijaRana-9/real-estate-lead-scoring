@@ -43,12 +43,29 @@ export default function Navbar() {
         { to: '/dashboard', label: 'Dashboard' },
         { to: '/dashboard?tab=My%20Listings', label: 'Listings' },
         { to: '/dashboard?tab=Leads', label: 'Leads' },
+        { to: '/agencies', label: 'Agencies' },
       ]
     : [
         { to: '/listings', label: 'Buy' },
+        { to: '/agencies', label: 'Agencies' },
         { to: '/signup', label: 'For Agents' },
         { to: '/about', label: 'About' },
       ]
+
+  // Exact match on pathname AND the query params the link cares about -
+  // string-prefix/pathname-only matching is what let '/dashboard',
+  // '/dashboard?tab=My%20Listings', and '/dashboard?tab=Leads' all read
+  // as "active" simultaneously (they share the same pathname; only the
+  // tab query param differs). A link with no query is only active when
+  // the current URL has no tab param either, so "Dashboard" doesn't stay
+  // lit while on the Leads tab.
+  const isLinkActive = (to) => {
+    const [linkPath, linkQuery] = to.split('?')
+    if (location.pathname !== linkPath) return false
+    const currentTab = new URLSearchParams(location.search).get('tab')
+    const linkTab = linkQuery ? new URLSearchParams(linkQuery).get('tab') : null
+    return currentTab === linkTab
+  }
 
   const handleLogout = () => {
     logout()
@@ -76,7 +93,7 @@ export default function Navbar() {
 
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
           {navLinks.map((link) => {
-            const isActive = location.pathname === link.to.split('?')[0]
+            const isActive = isLinkActive(link.to)
             return (
               <Link key={link.to} to={link.to} className="group relative py-1">
                 <span className={isActive ? 'text-brand-600 dark:text-brand-400' : 'group-hover:text-brand-600 dark:group-hover:text-brand-400'}>
@@ -137,7 +154,12 @@ export default function Navbar() {
         <div className="border-t border-gray-200 px-4 py-3 md:hidden dark:border-gray-800">
           <div className="flex flex-col gap-3 text-sm font-medium">
             {navLinks.map((link) => (
-              <Link key={link.to} to={link.to} onClick={() => setMenuOpen(false)}>
+              <Link
+                key={link.to}
+                to={link.to}
+                onClick={() => setMenuOpen(false)}
+                className={isLinkActive(link.to) ? 'text-brand-600 dark:text-brand-400' : ''}
+              >
                 {link.label}
               </Link>
             ))}

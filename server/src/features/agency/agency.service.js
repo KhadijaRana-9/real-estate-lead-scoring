@@ -73,6 +73,15 @@ async function getBranding(tenantId) {
   return agency;
 }
 
+// Full self-service profile read - backs the agency_admin's "Agency
+// Profile" settings form (prefills every field PROFILE_FIELDS below can
+// edit, plus the read-only platform-controlled ones like verified).
+async function getProfile(tenantId) {
+  const agency = await Agency.findById(tenantId);
+  if (!agency) throw notFound('Agency');
+  return agency;
+}
+
 const BRANDING_FIELDS = ['logo', 'favicon', 'primaryColor', 'secondaryColor'];
 
 async function updateBranding(tenantId, requester, data) {
@@ -88,6 +97,42 @@ async function updateBranding(tenantId, requester, data) {
   }
   await agency.save();
   auditLog.record({ tenantId, actor: requester, action: 'agency.branding_update', targetType: 'Agency', targetId: tenantId, metadata: { fields: changedFields } });
+  return agency;
+}
+
+const PROFILE_FIELDS = [
+  'description',
+  'whatsapp',
+  'website',
+  'address',
+  'city',
+  'country',
+  'coverBanner',
+  'licenseNumber',
+  'establishedYear',
+  'languages',
+  'specializations',
+  'officeLocations',
+  'businessHours',
+  'socialMedia',
+];
+
+// Deliberately excludes verified/featured/subscriptionPlan - those are
+// platform-controlled (see platform/agencies.service.js), never
+// agency-self-declared, so the public marketplace badges mean something.
+async function updateProfile(tenantId, requester, data) {
+  const agency = await Agency.findById(tenantId);
+  if (!agency) throw notFound('Agency');
+
+  const changedFields = [];
+  for (const field of PROFILE_FIELDS) {
+    if (data[field] !== undefined) {
+      agency[field] = data[field];
+      changedFields.push(field);
+    }
+  }
+  await agency.save();
+  auditLog.record({ tenantId, actor: requester, action: 'agency.profile_update', targetType: 'Agency', targetId: tenantId, metadata: { fields: changedFields } });
   return agency;
 }
 
@@ -173,7 +218,9 @@ async function acceptInvite({ token, name, password }) {
 module.exports = {
   getPerformance,
   getBranding,
+  getProfile,
   updateBranding,
+  updateProfile,
   inviteUser,
   listInvites,
   revokeInvite,

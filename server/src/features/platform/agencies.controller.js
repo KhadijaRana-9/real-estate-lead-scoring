@@ -36,6 +36,24 @@ async function reactivate(req, res, next) {
   }
 }
 
+async function setVerified(req, res, next) {
+  try {
+    const agency = await agenciesService.setVerified(req.params.id, req.body.verified, req.user);
+    res.json(agency);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function setFeatured(req, res, next) {
+  try {
+    const agency = await agenciesService.setFeatured(req.params.id, req.body.featured, req.user);
+    res.json(agency);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function remove(req, res, next) {
   try {
     await agenciesService.deleteAgency(req.params.id);
@@ -45,4 +63,4 @@ async function remove(req, res, next) {
   }
 }
 
-module.exports = { list, create, suspend, reactivate, remove };
+module.exports = { list, create, suspend, reactivate, setVerified, setFeatured, remove };

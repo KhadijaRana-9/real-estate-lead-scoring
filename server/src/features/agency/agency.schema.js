@@ -36,4 +36,46 @@ const updateBrandingSchema = {
   }),
 };
 
-module.exports = { inviteUserSchema, idParamSchema, acceptInviteSchema, updateBrandingSchema };
+const officeLocationSchema = z.object({
+  label: z.string().trim().max(100).optional(),
+  address: z.string().trim().max(300).optional(),
+  city: z.string().trim().max(100).optional(),
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lng: z.coerce.number().min(-180).max(180).optional(),
+});
+
+const businessHourSchema = z.object({
+  day: z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']),
+  open: z.string().trim().max(10).optional(),
+  close: z.string().trim().max(10).optional(),
+  closed: z.coerce.boolean().optional(),
+});
+
+const updateProfileSchema = {
+  body: z.object({
+    description: z.string().trim().max(3000).optional(),
+    whatsapp: z.string().trim().max(30).optional(),
+    website: z.string().trim().max(300).optional(),
+    address: z.string().trim().max(300).optional(),
+    city: z.string().trim().max(100).optional(),
+    country: z.string().trim().max(100).optional(),
+    coverBanner: z.string().trim().max(1000).optional(),
+    licenseNumber: z.string().trim().max(100).optional(),
+    establishedYear: z.coerce.number().int().min(1900).max(2100).optional(),
+    languages: z.array(z.string().trim().max(50)).max(20).optional(),
+    specializations: z.array(z.string().trim().max(50)).max(20).optional(),
+    officeLocations: z.array(officeLocationSchema).max(10).optional(),
+    businessHours: z.array(businessHourSchema).max(7).optional(),
+    socialMedia: z
+      .object({
+        facebook: z.string().trim().max(300).optional(),
+        instagram: z.string().trim().max(300).optional(),
+        twitter: z.string().trim().max(300).optional(),
+        linkedin: z.string().trim().max(300).optional(),
+        youtube: z.string().trim().max(300).optional(),
+      })
+      .optional(),
+  }),
+};
+
+module.exports = { inviteUserSchema, idParamSchema, acceptInviteSchema, updateBrandingSchema, updateProfileSchema };

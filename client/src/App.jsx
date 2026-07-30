@@ -7,6 +7,8 @@ import ScrollProgressBar from './components/ScrollProgressBar'
 import Home from './pages/Home'
 import Listings from './pages/Listings'
 import PropertyDetail from './pages/PropertyDetail'
+import AgenciesMarketplace from './pages/AgenciesMarketplace'
+import AgencyProfile from './pages/AgencyProfile'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import AgentDashboard from './pages/AgentDashboard'
@@ -33,6 +35,8 @@ export default function App() {
             <Route path="/" element={<AnimatedPage><Home /></AnimatedPage>} />
             <Route path="/listings" element={<AnimatedPage><Listings /></AnimatedPage>} />
             <Route path="/properties/:id" element={<AnimatedPage><PropertyDetail /></AnimatedPage>} />
+            <Route path="/agencies" element={<AnimatedPage><AgenciesMarketplace /></AnimatedPage>} />
+            <Route path="/agencies/:slug" element={<AnimatedPage><AgencyProfile /></AnimatedPage>} />
             <Route path="/login" element={<AnimatedPage><Login /></AnimatedPage>} />
             <Route path="/signup" element={<AnimatedPage><Signup /></AnimatedPage>} />
             <Route path="/about" element={<AnimatedPage><About /></AnimatedPage>} />

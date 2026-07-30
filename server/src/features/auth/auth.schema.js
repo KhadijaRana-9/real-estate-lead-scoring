@@ -31,4 +31,14 @@ const logoutSchema = {
   }),
 };
 
-module.exports = { signupSchema, loginSchema, refreshSchema, logoutSchema };
+const updateMeSchema = {
+  body: z
+    .object({
+      phone: z.string().trim().max(30).optional(),
+      whatsapp: z.string().trim().max(30).optional(),
+      avatar: z.string().trim().max(1000).optional(),
+    })
+    .refine((data) => Object.keys(data).length > 0, { message: 'At least one field is required' }),
+};
+
+module.exports = { signupSchema, loginSchema, refreshSchema, logoutSchema, updateMeSchema };

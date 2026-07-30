@@ -34,6 +34,7 @@ const EMPTY_PROPERTY = {
   amenities: [],
   images: [],
   videos: [],
+  media: { images: [], videos: [] },
   virtualTourUrl: '',
   documents: [],
   price: 0,
@@ -197,7 +198,7 @@ export default function PropertyWizard({ property: existingProperty, onClose, on
               exit={{ opacity: 0, x: -12 }}
               transition={{ duration: 0.2 }}
             >
-              <StepComponent property={property} onChange={handleChange} />
+              <StepComponent property={property} onChange={handleChange} propertyId={propertyId} />
             </motion.div>
           </AnimatePresence>
         </div>

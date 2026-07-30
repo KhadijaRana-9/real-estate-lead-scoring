@@ -13,10 +13,12 @@ import RecentActivity from '../components/RecentActivity'
 import LeadStatusPie from '../components/charts/LeadStatusPie'
 import MonthlyInquiriesLine from '../components/charts/MonthlyInquiriesLine'
 import TopPropertiesBar from '../components/charts/TopPropertiesBar'
+import AgencyProfileSettings from '../components/AgencyProfileSettings'
+import { useAuth } from '../context/AuthContext'
 import { formatPKR, formatDate } from '../utils/format'
 import { fadeUp, staggerContainer, staggerItem } from '../motion/variants'
 
-const TABS = ['Overview', 'Leads', 'My Listings']
+const BASE_TABS = ['Overview', 'Leads', 'My Listings']
 
 function DashboardSkeleton() {
   return (
@@ -37,6 +39,8 @@ function DashboardSkeleton() {
 }
 
 export default function AgentDashboard() {
+  const { user } = useAuth()
+  const TABS = user?.role === 'agency_admin' ? [...BASE_TABS, 'Agency Profile'] : BASE_TABS
   const [searchParams, setSearchParams] = useSearchParams()
   const initialTab = TABS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'Overview'
   const [tab, setTabState] = useState(initialTab)
@@ -277,6 +281,8 @@ export default function AgentDashboard() {
               </div>
             )
           )}
+
+          {tab === 'Agency Profile' && <AgencyProfileSettings />}
         </motion.div>
       </AnimatePresence>
 
