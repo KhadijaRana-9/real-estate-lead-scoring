@@ -1,4 +1,11 @@
 .vercel
 .env*
-uploads/
+# Anchored to this directory only - runtime files written by the local
+# storage provider (shared/storage/providers/localProvider.js). An
+# unanchored "uploads/" here also matched src/features/uploads/ (real
+# source code: uploads.routes.js/controller.js/middleware.js), silently
+# excluding it from every commit ever since - the exact cause of the
+# production "Cannot find module './features/uploads/uploads.routes'"
+# crash, since those files were never actually pushed to GitHub.
+/uploads/
 coverage/
