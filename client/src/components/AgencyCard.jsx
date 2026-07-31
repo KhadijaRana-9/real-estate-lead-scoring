@@ -1,8 +1,15 @@
 import { useRef } from 'react'
 import { Link } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion'
-import { FiMapPin, FiCheckCircle, FiStar, FiHome, FiUsers, FiArrowRight, FiPhone, FiMessageCircle } from 'react-icons/fi'
+import {
+  FiMapPin, FiCheckCircle, FiStar, FiHome, FiUsers, FiArrowRight, FiPhone, FiMessageCircle,
+  FiHeart, FiBarChart2, FiShare2, FiShield,
+} from 'react-icons/fi'
 import { staggerItem } from '../motion/variants'
+import { useAuth } from '../context/AuthContext'
+import useAgencySave from '../hooks/useAgencySave'
+import useAgencyCompare from '../hooks/useAgencyCompare'
 
 const FALLBACK_COVER =
   'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=60'
@@ -11,12 +18,26 @@ const TILT_RANGE = 4
 
 const PLAN_LABEL = { starter: 'Starter', professional: 'Professional', enterprise: 'Premium' }
 
+function TrustBadge({ score }) {
+  if (score == null) return null
+  const tier = score >= 75 ? 'bg-emerald-500' : score >= 45 ? 'bg-amber-500' : 'bg-gray-400'
+  return (
+    <span className={`flex items-center gap-1 rounded-full ${tier} px-2 py-0.5 text-[11px] font-semibold text-white shadow`} title="Trust Score - verification, ratings, experience, and activity combined">
+      <FiShield size={11} /> {score}
+    </span>
+  )
+}
+
 export default function AgencyCard({ agency, view = 'grid' }) {
+  const { user } = useAuth()
   const cardRef = useRef(null)
   const mouseX = useMotionValue(0.5)
   const mouseY = useMotionValue(0.5)
   const rotateX = useSpring(useTransform(mouseY, [0, 1], [TILT_RANGE, -TILT_RANGE]), { stiffness: 300, damping: 30 })
   const rotateY = useSpring(useTransform(mouseX, [0, 1], [-TILT_RANGE, TILT_RANGE]), { stiffness: 300, damping: 30 })
+
+  const { isSaved, toggle: toggleSave } = useAgencySave(agency.slug)
+  const { isInCompare, toggle: toggleCompare, maxReached } = useAgencyCompare(agency.slug)
 
   const handleMouseMove = (e) => {
     const rect = cardRef.current?.getBoundingClientRect()
@@ -27,6 +48,22 @@ export default function AgencyCard({ agency, view = 'grid' }) {
   const handleMouseLeave = () => {
     mouseX.set(0.5)
     mouseY.set(0.5)
+  }
+
+  const handleShare = async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const url = `${window.location.origin}/agencies/${agency.slug}`
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: agency.companyName, url })
+      } catch {
+        /* cancelled */
+      }
+    } else {
+      await navigator.clipboard.writeText(url)
+      toast.success('Link copied')
+    }
   }
 
   const cover = agency.coverBanner || FALLBACK_COVER
@@ -48,9 +85,30 @@ export default function AgencyCard({ agency, view = 'grid' }) {
       <Link to={`/agencies/${agency.slug}`} className={isList ? 'relative h-40 w-full shrink-0 overflow-hidden sm:h-auto sm:w-64' : 'relative block h-32 w-full overflow-hidden'}>
         <img src={cover} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-        {agency.featured && (
-          <span className="absolute left-3 top-3 rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-semibold text-white shadow">Featured</span>
-        )}
+        <div className="absolute left-3 top-3 flex gap-1.5">
+          {agency.featured && <span className="rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-semibold text-white shadow">Featured</span>}
+          <TrustBadge score={stats.trustScore} />
+        </div>
+        <div className="absolute right-3 top-3 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSave() }}
+            title={isSaved ? 'Remove from saved' : 'Save agency'}
+            className={`flex h-7 w-7 items-center justify-center rounded-full shadow ${isSaved ? 'bg-red-500 text-white' : 'bg-white/90 text-gray-600 hover:bg-white'}`}
+          >
+            <FiHeart size={13} className={isSaved ? 'fill-white' : ''} />
+          </button>
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleCompare() }}
+            disabled={!isInCompare && maxReached}
+            title="Compare"
+            className={`flex h-7 w-7 items-center justify-center rounded-full shadow disabled:opacity-40 ${isInCompare ? 'bg-brand-600 text-white' : 'bg-white/90 text-gray-600 hover:bg-white'}`}
+          >
+            <FiBarChart2 size={13} />
+          </button>
+          <button onClick={handleShare} title="Share" className="flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-gray-600 shadow hover:bg-white">
+            <FiShare2 size={13} />
+          </button>
+        </div>
         <div className="absolute -bottom-6 left-4 h-14 w-14 overflow-hidden rounded-xl border-2 border-white bg-white shadow-md dark:border-gray-900">
           {agency.logo ? (
             <img src={agency.logo} alt={agency.companyName} className="h-full w-full object-cover" />
@@ -81,7 +139,7 @@ export default function AgencyCard({ agency, view = 'grid' }) {
           </p>
         )}
 
-        <div className="mt-3 flex items-center gap-4 text-xs text-gray-600 dark:text-gray-300">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
           <span className="flex items-center gap-1">
             <FiHome size={13} /> {stats.activeListings ?? 0} listings
           </span>
@@ -92,6 +150,7 @@ export default function AgencyCard({ agency, view = 'grid' }) {
             <FiStar size={13} className={stats.reviewCount ? 'text-amber-500' : ''} />
             {stats.reviewCount ? `${stats.rating} (${stats.reviewCount})` : 'No reviews yet'}
           </span>
+          {stats.followerCount > 0 && <span className="text-gray-400">{stats.followerCount} followers</span>}
         </div>
 
         <div className="mt-4 flex items-center gap-2">
@@ -124,6 +183,7 @@ export default function AgencyCard({ agency, view = 'grid' }) {
             </a>
           )}
         </div>
+        {!user && <p className="mt-2 text-center text-[10px] text-gray-400">Log in to follow this agency</p>}
       </div>
     </motion.div>
   )

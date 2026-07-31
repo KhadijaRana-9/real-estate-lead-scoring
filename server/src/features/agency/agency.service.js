@@ -115,6 +115,12 @@ const PROFILE_FIELDS = [
   'officeLocations',
   'businessHours',
   'socialMedia',
+  'ceoMessage',
+  'mission',
+  'vision',
+  'timeline',
+  'awards',
+  'officeGallery',
 ];
 
 // Deliberately excludes verified/featured/subscriptionPlan - those are

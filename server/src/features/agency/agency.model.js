@@ -25,6 +25,16 @@ const businessHoursSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const timelineEventSchema = new mongoose.Schema(
+  { year: { type: Number, required: true }, title: { type: String, trim: true, required: true, maxlength: 200 } },
+  { _id: false }
+);
+
+const awardSchema = new mongoose.Schema(
+  { title: { type: String, trim: true, required: true, maxlength: 200 }, year: { type: Number, default: null }, issuer: { type: String, trim: true, default: '', maxlength: 200 } },
+  { _id: false }
+);
+
 const agencySchema = new mongoose.Schema(
   {
     companyName: { type: String, required: true, trim: true },
@@ -62,6 +72,16 @@ const agencySchema = new mongoose.Schema(
     specializations: { type: [String], default: [] },
     officeLocations: { type: [officeLocationSchema], default: [] },
     businessHours: { type: [businessHoursSchema], default: [] },
+
+    // Company-microsite narrative content - all optional, all rendered
+    // only when an admin actually fills them in (see AgencyProfile.jsx).
+    // Never pre-filled with placeholder/marketing copy.
+    ceoMessage: { type: String, trim: true, default: '', maxlength: 2000 },
+    mission: { type: String, trim: true, default: '', maxlength: 1000 },
+    vision: { type: String, trim: true, default: '', maxlength: 1000 },
+    timeline: { type: [timelineEventSchema], default: [] },
+    awards: { type: [awardSchema], default: [] },
+    officeGallery: { type: [String], default: [] },
     socialMedia: {
       facebook: { type: String, trim: true, default: '' },
       instagram: { type: String, trim: true, default: '' },

@@ -9,6 +9,16 @@ const reviewSchema = new mongoose.Schema(
     },
     rating: { type: Number, required: true, min: 1, max: 5 },
     comment: { type: String, trim: true, default: '', maxlength: 2000 },
+    images: { type: [String], default: [] },
+    // "Verified" here means the reviewer actually submitted a real
+    // inquiry to this agency before reviewing - not a fabricated badge.
+    // See review.service.js's upsertReview.
+    verifiedInquiry: { type: Boolean, default: false },
+    reply: {
+      text: { type: String, trim: true, default: '', maxlength: 1000 },
+      repliedAt: { type: Date, default: null },
+    },
+    helpfulUserIds: { type: [mongoose.Schema.Types.ObjectId], default: [] },
   },
   { timestamps: true }
 );

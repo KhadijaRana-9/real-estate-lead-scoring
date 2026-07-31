@@ -1,5 +1,6 @@
 const directoryService = require('./agencyDirectory.service');
 const reviewService = require('../review/review.service');
+const followService = require('../follow/follow.service');
 const Agency = require('../agency/agency.model');
 
 async function list(req, res, next) {
@@ -22,7 +23,34 @@ async function homepageSections(req, res, next) {
 
 async function profile(req, res, next) {
   try {
-    const result = await directoryService.getAgencyProfile(req.params.slug);
+    const result = await directoryService.getAgencyProfile(req.params.slug, req.user?.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function autocomplete(req, res, next) {
+  try {
+    const result = await directoryService.autocomplete(req.query.q);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function compare(req, res, next) {
+  try {
+    const result = await directoryService.compareAgencies(req.query.slugs);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function platformStats(req, res, next) {
+  try {
+    const result = await directoryService.getPublicPlatformStats();
     res.json(result);
   } catch (err) {
     next(err);
@@ -69,4 +97,56 @@ async function deleteReview(req, res, next) {
   }
 }
 
-module.exports = { list, homepageSections, profile, listReviews, submitReview, deleteReview };
+async function followAgency(req, res, next) {
+  try {
+    const agencyId = await resolveAgencyId(req.params.slug);
+    const result = await followService.follow(agencyId, req.user.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function unfollowAgency(req, res, next) {
+  try {
+    const agencyId = await resolveAgencyId(req.params.slug);
+    const result = await followService.unfollow(agencyId, req.user.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function toggleHelpful(req, res, next) {
+  try {
+    const result = await reviewService.toggleHelpful(req.params.reviewId, req.user.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function replyToReview(req, res, next) {
+  try {
+    const result = await reviewService.replyToReview(req.tenant._id, req.params.reviewId, req.body.text);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  list,
+  homepageSections,
+  profile,
+  autocomplete,
+  compare,
+  platformStats,
+  listReviews,
+  submitReview,
+  deleteReview,
+  followAgency,
+  unfollowAgency,
+  toggleHelpful,
+  replyToReview,
+};

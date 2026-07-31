@@ -1,20 +1,41 @@
 import { useEffect, useState, useCallback } from 'react'
-import { motion } from 'framer-motion'
-import { FiSearch, FiGrid, FiList, FiCheckCircle, FiAward, FiTrendingUp, FiClock, FiStar } from 'react-icons/fi'
+import { Link } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { FiGrid, FiList, FiMap, FiMenu, FiCheckCircle, FiAward, FiTrendingUp, FiClock, FiStar, FiBarChart2, FiX } from 'react-icons/fi'
 import * as api from '../api/endpoints'
 import AgencyCard from '../components/AgencyCard'
+import AgencyMarketplaceHero from '../components/AgencyMarketplaceHero'
+import AgencyMapView from '../components/AgencyMapView'
 import SkeletonCard from '../components/SkeletonCard'
 import EmptyState from '../components/EmptyState'
 import Pagination from '../components/Pagination'
-import { staggerContainer, fadeUp } from '../motion/variants'
+import useAgencyCompare from '../hooks/useAgencyCompare'
+import { staggerContainer } from '../motion/variants'
 
 const PAGE_SIZE = 9
+const VIEW_STORAGE_KEY = 'dreamhomes_agency_view_mode'
 
 const QUICK_FILTERS = [
   { key: 'all', label: 'All Agencies', icon: FiGrid, params: {} },
   { key: 'verified', label: 'Verified', icon: FiCheckCircle, params: { verified: 'true' } },
   { key: 'premium', label: 'Premium', icon: FiAward, params: { plan: 'enterprise' } },
-  { key: 'newest', label: 'Newest', icon: FiClock, params: { sort: 'newest' } },
+]
+
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'trust_score', label: 'Highest Trust Score' },
+  { value: 'highest_rated', label: 'Highest Rated' },
+  { value: 'most_properties', label: 'Most Properties' },
+  { value: 'most_sold', label: 'Most Sold' },
+  { value: 'most_viewed', label: 'Most Viewed' },
+  { value: 'name_asc', label: 'Alphabetical' },
+]
+
+const VIEW_MODES = [
+  { key: 'grid', label: 'Grid', icon: FiGrid },
+  { key: 'list', label: 'List', icon: FiList },
+  { key: 'compact', label: 'Compact', icon: FiMenu },
+  { key: 'map', label: 'Map', icon: FiMap },
 ]
 
 function SectionStrip({ title, icon: Icon, items, loading }) {
@@ -31,13 +52,34 @@ function SectionStrip({ title, icon: Icon, items, loading }) {
                 <SkeletonCard />
               </div>
             ))
-          : items.map((a, i) => (
+          : items.map((a) => (
               <div key={a._id} className="w-72 shrink-0">
-                <AgencyCard agency={a} index={i} />
+                <AgencyCard agency={a} />
               </div>
             ))}
       </div>
     </section>
+  )
+}
+
+function CompactRow({ agency }) {
+  return (
+    <Link to={`/agencies/${agency.slug}`} className="flex items-center gap-3 rounded-xl border border-gray-200 p-3 hover:border-brand-400 dark:border-gray-800">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+        {agency.logo ? <img src={agency.logo} alt="" className="h-full w-full object-cover" /> : agency.companyName?.[0]}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-1 truncate text-sm font-medium">
+          {agency.companyName}
+          {agency.verified && <FiCheckCircle className="shrink-0 text-brand-500" size={12} />}
+        </p>
+        <p className="truncate text-xs text-gray-400">{agency.city}</p>
+      </div>
+      <div className="shrink-0 text-right text-xs text-gray-500 dark:text-gray-400">
+        <p>{agency.stats?.activeListings ?? 0} listings</p>
+        <p>{agency.stats?.rating ? `${agency.stats.rating}★` : 'No reviews'}</p>
+      </div>
+    </Link>
   )
 }
 
@@ -46,14 +88,20 @@ export default function AgenciesMarketplace() {
   const [sectionsLoading, setSectionsLoading] = useState(true)
 
   const [search, setSearch] = useState('')
-  const [searchInput, setSearchInput] = useState('')
   const [activeQuickFilter, setActiveQuickFilter] = useState('all')
   const [city, setCity] = useState('')
-  const [view, setView] = useState('grid')
+  const [sort, setSort] = useState('newest')
+  const [view, setView] = useState(() => localStorage.getItem(VIEW_STORAGE_KEY) || 'grid')
   const [page, setPage] = useState(1)
   const [result, setResult] = useState({ items: [], pagination: { totalPages: 1, total: 0 } })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+
+  const { compareSlugs, clear: clearCompare } = useAgencyCompare()
+
+  useEffect(() => {
+    localStorage.setItem(VIEW_STORAGE_KEY, view)
+  }, [view])
 
   useEffect(() => {
     api
@@ -67,7 +115,7 @@ export default function AgenciesMarketplace() {
     setLoading(true)
     setError(false)
     const quickParams = QUICK_FILTERS.find((f) => f.key === activeQuickFilter)?.params || {}
-    const params = { page, limit: PAGE_SIZE, ...quickParams }
+    const params = { page, limit: view === 'map' ? 50 : PAGE_SIZE, sort, ...quickParams }
     if (search) params.search = search
     if (city) params.city = city
 
@@ -76,15 +124,14 @@ export default function AgenciesMarketplace() {
       .then(({ data }) => setResult(data))
       .catch(() => setError(true))
       .finally(() => setLoading(false))
-  }, [page, search, city, activeQuickFilter])
+  }, [page, search, city, activeQuickFilter, sort, view])
 
   useEffect(() => {
     fetchDirectory()
   }, [fetchDirectory])
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault()
-    setSearch(searchInput.trim())
+  const handleSearch = (term) => {
+    setSearch(term)
     setPage(1)
   }
 
@@ -93,29 +140,19 @@ export default function AgenciesMarketplace() {
     setPage(1)
   }
 
+  const clearAll = () => {
+    setSearch('')
+    setCity('')
+    setActiveQuickFilter('all')
+    setSort('newest')
+    setPage(1)
+  }
+
+  const gridClass = { grid: 'grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3', list: 'space-y-4', compact: 'space-y-2' }[view]
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <motion.div initial="hidden" animate="visible" variants={fadeUp} className="mb-10 text-center">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50 sm:text-4xl">Find a Trusted Real Estate Agency</h1>
-        <p className="mx-auto mt-2 max-w-xl text-gray-500 dark:text-gray-400">
-          Browse every verified agency on the platform - real listings, real agents, real reviews.
-        </p>
-
-        <form onSubmit={handleSearchSubmit} className="mx-auto mt-6 flex max-w-lg items-center gap-2">
-          <div className="relative flex-1">
-            <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search agency name or city..."
-              className="w-full rounded-xl border border-gray-300 bg-white py-2.5 pl-10 pr-3 text-sm outline-none focus:border-brand-400 dark:border-gray-700 dark:bg-gray-900"
-            />
-          </div>
-          <button type="submit" className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">
-            Search
-          </button>
-        </form>
-      </motion.div>
+      <AgencyMarketplaceHero onSearch={handleSearch} />
 
       {sections && !sectionsLoading && (
         <>
@@ -153,23 +190,32 @@ export default function AgenciesMarketplace() {
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
+          <select
+            value={sort}
+            onChange={(e) => {
+              setSort(e.target.value)
+              setPage(1)
+            }}
+            className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900"
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
         </div>
 
         <div className="flex items-center gap-1 rounded-lg border border-gray-300 p-0.5 dark:border-gray-700">
-          <button
-            onClick={() => setView('grid')}
-            aria-label="Grid view"
-            className={`rounded-md p-1.5 ${view === 'grid' ? 'bg-brand-600 text-white' : 'text-gray-500'}`}
-          >
-            <FiGrid size={15} />
-          </button>
-          <button
-            onClick={() => setView('list')}
-            aria-label="List view"
-            className={`rounded-md p-1.5 ${view === 'list' ? 'bg-brand-600 text-white' : 'text-gray-500'}`}
-          >
-            <FiList size={15} />
-          </button>
+          {VIEW_MODES.map((v) => (
+            <button
+              key={v.key}
+              onClick={() => setView(v.key)}
+              aria-label={`${v.label} view`}
+              title={`${v.label} view`}
+              className={`rounded-md p-1.5 ${view === v.key ? 'bg-brand-600 text-white' : 'text-gray-500'}`}
+            >
+              <v.icon size={15} />
+            </button>
+          ))}
         </div>
       </div>
 
@@ -188,7 +234,7 @@ export default function AgenciesMarketplace() {
           }
         />
       ) : loading ? (
-        <div className={view === 'grid' ? 'grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3' : 'space-y-4'}>
+        <div className={gridClass}>
           {Array.from({ length: PAGE_SIZE }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : result.items.length === 0 ? (
@@ -197,35 +243,47 @@ export default function AgenciesMarketplace() {
           title="No agencies found"
           message="Try a different search, city, or filter."
           action={
-            <button
-              onClick={() => {
-                setSearch('')
-                setSearchInput('')
-                setCity('')
-                setActiveQuickFilter('all')
-                setPage(1)
-              }}
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white"
-            >
+            <button onClick={clearAll} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white">
               Clear Filters
             </button>
           }
         />
+      ) : view === 'map' ? (
+        <AgencyMapView agencies={result.items} />
+      ) : view === 'compact' ? (
+        <motion.div initial="hidden" animate="visible" variants={staggerContainer(0.03)} className={gridClass}>
+          {result.items.map((a) => <CompactRow key={a._id} agency={a} />)}
+        </motion.div>
       ) : (
         <>
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={staggerContainer(0.05)}
-            className={view === 'grid' ? 'grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3' : 'space-y-4'}
-          >
-            {result.items.map((a, i) => (
-              <AgencyCard key={a._id} agency={a} index={i} view={view} />
+          <motion.div initial="hidden" animate="visible" variants={staggerContainer(0.05)} className={gridClass}>
+            {result.items.map((a) => (
+              <AgencyCard key={a._id} agency={a} view={view} />
             ))}
           </motion.div>
           <Pagination page={page} totalPages={result.pagination.totalPages} onChange={setPage} />
         </>
       )}
+
+      <AnimatePresence>
+        {compareSlugs.length >= 2 && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            className="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-3 shadow-2xl dark:border-gray-800 dark:bg-gray-900"
+          >
+            <FiBarChart2 className="text-brand-500" />
+            <span className="text-sm font-medium">{compareSlugs.length} agencies selected</span>
+            <Link to={`/agencies/compare?slugs=${compareSlugs.join(',')}`} className="rounded-lg bg-brand-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-brand-700">
+              Compare Now
+            </Link>
+            <button onClick={clearCompare} aria-label="Clear compare" className="text-gray-400 hover:text-gray-600">
+              <FiX size={16} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

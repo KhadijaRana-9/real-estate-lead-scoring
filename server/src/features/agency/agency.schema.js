@@ -51,6 +51,17 @@ const businessHourSchema = z.object({
   closed: z.coerce.boolean().optional(),
 });
 
+const timelineEventSchema = z.object({
+  year: z.coerce.number().int().min(1900).max(2100),
+  title: z.string().trim().min(1).max(200),
+});
+
+const awardSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  year: z.coerce.number().int().min(1900).max(2100).optional(),
+  issuer: z.string().trim().max(200).optional(),
+});
+
 const updateProfileSchema = {
   body: z.object({
     description: z.string().trim().max(3000).optional(),
@@ -75,6 +86,12 @@ const updateProfileSchema = {
         youtube: z.string().trim().max(300).optional(),
       })
       .optional(),
+    ceoMessage: z.string().trim().max(2000).optional(),
+    mission: z.string().trim().max(1000).optional(),
+    vision: z.string().trim().max(1000).optional(),
+    timeline: z.array(timelineEventSchema).max(20).optional(),
+    awards: z.array(awardSchema).max(20).optional(),
+    officeGallery: z.array(z.string().trim().url()).max(30).optional(),
   }),
 };
 

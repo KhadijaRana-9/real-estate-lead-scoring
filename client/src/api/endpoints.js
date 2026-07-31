@@ -81,10 +81,17 @@ export const setAgencyFeatured = (id, featured) => api.patch(`/platform/agencies
 // anonymous visitors exactly like the rest of the public site.
 export const getAgencyDirectory = (params) => api.get('/agencies', { params })
 export const getAgencyHomepageSections = () => api.get('/agencies/sections')
+export const getAgencyPlatformStats = () => api.get('/agencies/platform-stats')
+export const getAgencyAutocomplete = (q) => api.get('/agencies/autocomplete', { params: { q } })
+export const compareAgencies = (slugs) => api.get('/agencies/compare', { params: { slugs: slugs.join(',') } })
 export const getAgencyProfile = (slug) => api.get(`/agencies/${slug}`)
 export const getAgencyReviews = (slug, params) => api.get(`/agencies/${slug}/reviews`, { params })
 export const submitAgencyReview = (slug, data) => api.post(`/agencies/${slug}/reviews`, data)
 export const deleteAgencyReview = (slug) => api.delete(`/agencies/${slug}/reviews`)
+export const toggleReviewHelpful = (reviewId) => api.post(`/agencies/reviews/${reviewId}/helpful`)
+export const replyToReview = (reviewId, text) => api.post(`/agencies/reviews/${reviewId}/reply`, { text })
+export const followAgency = (slug) => api.post(`/agencies/${slug}/follow`)
+export const unfollowAgency = (slug) => api.delete(`/agencies/${slug}/follow`)
 
 export const getAgencyProfileSettings = () => api.get('/agency/profile')
 export const updateAgencyProfileSettings = (data) => api.patch('/agency/profile', data)

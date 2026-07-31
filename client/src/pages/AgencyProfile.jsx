@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import {
   FiMapPin, FiCheckCircle, FiStar, FiHome, FiUsers, FiEye, FiPhone, FiMessageCircle,
   FiMail, FiGlobe, FiClock, FiAward, FiFileText, FiFacebook, FiInstagram, FiTwitter,
-  FiLinkedin, FiYoutube, FiExternalLink,
+  FiLinkedin, FiYoutube, FiExternalLink, FiShield, FiHeart, FiThumbsUp, FiFlag, FiImage,
 } from 'react-icons/fi'
 import * as api from '../api/endpoints'
 import { useAuth } from '../context/AuthContext'
@@ -45,6 +45,7 @@ function StarPicker({ value, onChange }) {
 function ReviewForm({ slug, onSubmitted }) {
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
+  const [imageUrl, setImageUrl] = useState('')
   const [saving, setSaving] = useState(false)
 
   const handleSubmit = async (e) => {
@@ -55,10 +56,11 @@ function ReviewForm({ slug, onSubmitted }) {
     }
     setSaving(true)
     try {
-      await api.submitAgencyReview(slug, { rating, comment })
+      await api.submitAgencyReview(slug, { rating, comment, images: imageUrl ? [imageUrl] : [] })
       toast.success('Review submitted')
       setRating(0)
       setComment('')
+      setImageUrl('')
       onSubmitted()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not submit review')
@@ -78,6 +80,15 @@ function ReviewForm({ slug, onSubmitted }) {
         placeholder="Share your experience with this agency..."
         className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-400 dark:border-gray-700 dark:bg-gray-800"
       />
+      <div className="relative">
+        <FiImage className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+        <input
+          value={imageUrl}
+          onChange={(e) => setImageUrl(e.target.value)}
+          placeholder="Photo URL (optional)"
+          className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-8 pr-3 text-xs outline-none focus:border-brand-400 dark:border-gray-700 dark:bg-gray-800"
+        />
+      </div>
       <button
         type="submit"
         disabled={saving}
@@ -86,6 +97,159 @@ function ReviewForm({ slug, onSubmitted }) {
         {saving ? 'Submitting...' : 'Submit Review'}
       </button>
     </form>
+  )
+}
+
+function ReviewCard({ review, isAgencyAdmin, onReplied }) {
+  const [helpfulCount, setHelpfulCount] = useState(review.helpfulUserIds?.length || 0)
+  const [marked, setMarked] = useState(false)
+  const [replying, setReplying] = useState(false)
+  const [replyText, setReplyText] = useState('')
+
+  const handleHelpful = async () => {
+    try {
+      const { data } = await api.toggleReviewHelpful(review._id)
+      setHelpfulCount(data.helpfulCount)
+      setMarked(data.marked)
+    } catch {
+      toast.error('Could not update')
+    }
+  }
+
+  const handleReply = async () => {
+    if (!replyText.trim()) return
+    try {
+      await api.replyToReview(review._id, replyText.trim())
+      toast.success('Reply posted')
+      setReplying(false)
+      onReplied()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not post reply')
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-800">
+      <div className="flex items-center justify-between">
+        <p className="flex items-center gap-1.5 text-sm font-medium">
+          {review.author.name}
+          {review.verifiedInquiry && (
+            <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+              <FiCheckCircle size={9} /> Verified
+            </span>
+          )}
+        </p>
+        <span className="flex items-center gap-0.5 text-xs text-amber-500">
+          <FiStar className="fill-amber-400" size={12} /> {review.rating}
+        </span>
+      </div>
+      {review.comment && <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{review.comment}</p>}
+      {review.images?.length > 0 && (
+        <div className="mt-2 flex gap-2">
+          {review.images.map((url) => (
+            <img key={url} src={url} alt="" className="h-16 w-16 rounded-lg object-cover" />
+          ))}
+        </div>
+      )}
+      <div className="mt-2 flex items-center gap-3 text-xs text-gray-400">
+        <span>{formatDate(review.createdAt)}</span>
+        <button onClick={handleHelpful} className={`flex items-center gap-1 hover:text-brand-600 ${marked ? 'text-brand-600' : ''}`}>
+          <FiThumbsUp size={12} /> Helpful{helpfulCount > 0 ? ` (${helpfulCount})` : ''}
+        </button>
+        <button className="flex items-center gap-1 hover:text-red-500">
+          <FiFlag size={12} /> Report
+        </button>
+      </div>
+
+      {review.reply?.text && (
+        <div className="mt-3 rounded-lg bg-gray-50 p-2.5 dark:bg-gray-800/60">
+          <p className="text-[11px] font-semibold text-brand-600 dark:text-brand-400">Agency Response</p>
+          <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-300">{review.reply.text}</p>
+        </div>
+      )}
+      {isAgencyAdmin && !review.reply?.text && (
+        <div className="mt-2">
+          {replying ? (
+            <div className="flex gap-2">
+              <input
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Write a reply..."
+                className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-800"
+              />
+              <button onClick={handleReply} className="rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-medium text-white">Post</button>
+            </div>
+          ) : (
+            <button onClick={() => setReplying(true)} className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">Reply as agency</button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RatingDistribution({ distribution, average, count }) {
+  if (!count) return null
+  return (
+    <div className="mb-4 flex flex-col gap-4 rounded-xl border border-gray-200 p-4 sm:flex-row sm:items-center dark:border-gray-800">
+      <div className="shrink-0 text-center">
+        <p className="text-3xl font-bold">{average}</p>
+        <div className="flex justify-center text-amber-400">
+          {[1, 2, 3, 4, 5].map((n) => <FiStar key={n} size={12} className={n <= Math.round(average) ? 'fill-amber-400' : 'text-gray-300 dark:text-gray-700'} />)}
+        </div>
+        <p className="mt-0.5 text-xs text-gray-400">{count} reviews</p>
+      </div>
+      <div className="flex-1 space-y-1">
+        {distribution.map((row) => (
+          <div key={row.star} className="flex items-center gap-2 text-xs">
+            <span className="w-3 text-gray-400">{row.star}</span>
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+              <div className="h-full rounded-full bg-amber-400" style={{ width: `${row.pct}%` }} />
+            </div>
+            <span className="w-8 text-right text-gray-400">{row.count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function FollowButton({ slug, initialFollowing }) {
+  const { user } = useAuth()
+  const [following, setFollowing] = useState(initialFollowing)
+  const [saving, setSaving] = useState(false)
+
+  const handleClick = async () => {
+    if (!user) {
+      toast.error('Log in to follow this agency')
+      return
+    }
+    setSaving(true)
+    try {
+      if (following) {
+        await api.unfollowAgency(slug)
+        setFollowing(false)
+      } else {
+        await api.followAgency(slug)
+        setFollowing(true)
+      }
+    } catch {
+      toast.error('Could not update follow status')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={saving}
+      className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold shadow disabled:opacity-60 ${
+        following ? 'bg-white text-brand-600' : 'bg-brand-600 text-white hover:bg-brand-700'
+      }`}
+    >
+      <FiHeart size={14} className={following ? 'fill-brand-600' : ''} /> {following ? 'Following' : 'Follow'}
+    </button>
   )
 }
 
@@ -159,12 +323,12 @@ export default function AgencyProfile() {
                 </div>
               )}
             </div>
-            <div className="pb-1">
+            <div className="flex-1 pb-1">
               <h1 className="flex items-center gap-2 text-2xl font-bold text-white drop-shadow sm:text-3xl">
                 {agency.companyName}
                 {agency.verified && <FiCheckCircle className="text-brand-400" title="Verified agency" />}
               </h1>
-              <p className="flex items-center gap-3 text-sm text-gray-200">
+              <p className="flex flex-wrap items-center gap-3 text-sm text-gray-200">
                 {(agency.city || agency.country) && (
                   <span className="flex items-center gap-1">
                     <FiMapPin size={13} /> {[agency.city, agency.country].filter(Boolean).join(', ')}
@@ -173,7 +337,14 @@ export default function AgencyProfile() {
                 <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs backdrop-blur">
                   {PLAN_LABEL[agency.subscriptionPlan] || agency.subscriptionPlan}
                 </span>
+                <span className="flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs backdrop-blur" title="Trust Score">
+                  <FiShield size={11} /> {stats.trustScore} Trust Score
+                </span>
+                {stats.followerCount > 0 && <span className="text-xs">{stats.followerCount} followers</span>}
               </p>
+            </div>
+            <div className="pb-1">
+              <FollowButton slug={slug} initialFollowing={agency.isFollowing} />
             </div>
           </div>
         </div>
@@ -277,6 +448,8 @@ export default function AgencyProfile() {
                 )}
               </h2>
 
+              <RatingDistribution distribution={agency.ratingDistribution} average={stats.rating} count={stats.reviewCount} />
+
               {user?.role === 'customer' && <div className="mb-4"><ReviewForm slug={slug} onSubmitted={fetchProfile} /></div>}
 
               {agency.reviews.items.length === 0 ? (
@@ -284,20 +457,78 @@ export default function AgencyProfile() {
               ) : (
                 <div className="space-y-3">
                   {agency.reviews.items.map((r) => (
-                    <div key={r._id} className="rounded-xl border border-gray-200 p-3 dark:border-gray-800">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium">{r.author.name}</p>
-                        <span className="flex items-center gap-0.5 text-xs text-amber-500">
-                          <FiStar className="fill-amber-400" size={12} /> {r.rating}
-                        </span>
-                      </div>
-                      {r.comment && <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{r.comment}</p>}
-                      <p className="mt-1 text-xs text-gray-400">{formatDate(r.createdAt)}</p>
-                    </div>
+                    <ReviewCard key={r._id} review={r} isAgencyAdmin={user?.role === 'agency_admin'} onReplied={fetchProfile} />
                   ))}
                 </div>
               )}
             </section>
+
+            {/* Company story - only rendered when an admin has actually filled it in */}
+            {(agency.ceoMessage || agency.mission || agency.vision) && (
+              <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                {agency.mission && (
+                  <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                    <h3 className="mb-1 text-sm font-semibold text-brand-600 dark:text-brand-400">Our Mission</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">{agency.mission}</p>
+                  </div>
+                )}
+                {agency.vision && (
+                  <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                    <h3 className="mb-1 text-sm font-semibold text-brand-600 dark:text-brand-400">Our Vision</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">{agency.vision}</p>
+                  </div>
+                )}
+                {agency.ceoMessage && (
+                  <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                    <h3 className="mb-1 text-sm font-semibold text-brand-600 dark:text-brand-400">A Message From Our CEO</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">{agency.ceoMessage}</p>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {agency.timeline?.length > 0 && (
+              <section>
+                <h2 className="mb-3 text-lg font-bold">Our Journey</h2>
+                <div className="space-y-3 border-l-2 border-brand-200 pl-4 dark:border-brand-900">
+                  {[...agency.timeline].sort((a, b) => a.year - b.year).map((event, i) => (
+                    <div key={i} className="relative">
+                      <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-brand-500" />
+                      <p className="text-xs font-semibold text-brand-600 dark:text-brand-400">{event.year}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">{event.title}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {agency.awards?.length > 0 && (
+              <section>
+                <h2 className="mb-3 text-lg font-bold">Awards &amp; Recognition</h2>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {agency.awards.map((award, i) => (
+                    <div key={i} className="flex items-center gap-3 rounded-xl border border-gray-200 p-3 dark:border-gray-800">
+                      <FiAward className="shrink-0 text-amber-500" size={20} />
+                      <div>
+                        <p className="text-sm font-medium">{award.title}</p>
+                        <p className="text-xs text-gray-400">{[award.issuer, award.year].filter(Boolean).join(' · ')}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {agency.officeGallery?.length > 0 && (
+              <section>
+                <h2 className="mb-3 text-lg font-bold">Office Gallery</h2>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {agency.officeGallery.map((url, i) => (
+                    <img key={i} src={url} alt="" className="aspect-square rounded-lg object-cover" />
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
 
           {/* Sidebar */}
