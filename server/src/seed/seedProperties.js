@@ -1,10 +1,15 @@
-// Reusable, re-runnable demo-dataset generator. Run with:
+// Reusable, PRODUCTION-SAFE demo-dataset generator. Run with:
 //   npm run seed:large
 //
 // Ensures a set of demo agencies/agents exist (never destructively
 // touches User/Agency - safe to re-run without breaking existing
-// logins), then wipes and regenerates Property + Inquiry so every run
-// produces a fresh, consistent, large dataset for demonstration.
+// logins). By default this is purely additive/idempotent: if these 5
+// demo agencies already have properties, it does nothing further. Any
+// deletion is scoped ONLY to agencyId IN (these 5 demo agencies' own
+// ids) - it can never touch a property/inquiry belonging to any other
+// agency, including real pre-existing production data that predates
+// these demo agencies entirely. Set SEED_FORCE_REGENERATE=true to
+// intentionally wipe and rebuild just these 5 agencies' own demo data.
 
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
@@ -225,8 +230,26 @@ async function seedProperties() {
     console.log(`  ${agency.companyName}: ${agents.length} agents`);
   }
 
-  console.log('Clearing existing Property and Inquiry data (Users/Agencies preserved)...');
-  await Promise.all([Property.deleteMany({}), Inquiry.deleteMany({})]);
+  // Scoped strictly to these 5 demo agencies' own ids - structurally
+  // incapable of touching a property/inquiry belonging to any other
+  // agency, no matter what this script's logic does from here.
+  const demoAgencyIds = agencyDocs.map((a) => a._id);
+  const existingDemoPropertyCount = await Property.countDocuments({ agencyId: { $in: demoAgencyIds } });
+  const forceRegenerate = process.env.SEED_FORCE_REGENERATE === 'true';
+
+  if (existingDemoPropertyCount > 0 && !forceRegenerate) {
+    console.log(`\nThese demo agencies already have ${existingDemoPropertyCount} properties - skipping generation (idempotent).`);
+    console.log('Set SEED_FORCE_REGENERATE=true to wipe and rebuild just this demo dataset.');
+    return process.exit(0);
+  }
+
+  if (forceRegenerate && existingDemoPropertyCount > 0) {
+    console.log(`Regenerating: clearing ${existingDemoPropertyCount} existing properties for these 5 demo agencies only...`);
+    await Promise.all([
+      Property.deleteMany({ agencyId: { $in: demoAgencyIds } }),
+      Inquiry.deleteMany({ agencyId: { $in: demoAgencyIds } }),
+    ]);
+  }
 
   const pickAgency = weightedAgencyPicker(agencyDocs);
 

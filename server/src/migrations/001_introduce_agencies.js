@@ -15,69 +15,35 @@
 //      accounts across two different agencies later.
 // Idempotent: safe to re-run: if the seed agency already exists, it exits
 // without making further changes.
+//
+// Core logic lives in ./lib/introduceAgencies.js so it can also run from
+// an already-connected process (see src/features/ops/ops.routes.js) for
+// environments where a direct DB connection string isn't available to
+// whoever needs to trigger this.
 
 require('dotenv').config();
 
 const loadEnv = require('../config/env');
 const connectDB = require('../config/db');
-const Agency = require('../features/agency/agency.model');
-const User = require('../features/auth/auth.model');
-const Property = require('../features/property/property.model');
-const Inquiry = require('../features/inquiry/inquiry.model');
-
-const SEED_AGENCY_SLUG = 'dreamhomes';
+const { runIntroduceAgenciesMigration } = require('./lib/introduceAgencies');
 
 async function migrate() {
   const env = loadEnv();
   await connectDB(env.mongoUri);
 
-  const existing = await Agency.findOne({ slug: SEED_AGENCY_SLUG });
-  if (existing) {
-    console.log(`Migration already applied - Agency "${existing.companyName}" (${existing._id}) exists. Nothing to do.`);
+  const result = await runIntroduceAgenciesMigration();
+
+  if (!result.applied) {
+    console.log(result.message);
     return finish(0);
   }
 
-  console.log('Creating seed Agency for existing data...');
-  const adminUser = await User.findOne({ role: 'admin' });
-
-  const agency = await Agency.create({
-    companyName: 'DreamHomes',
-    slug: SEED_AGENCY_SLUG,
-    contactEmail: adminUser ? adminUser.email : 'admin@dreamhomes.pk',
-    subscriptionPlan: 'professional',
-    subscriptionStatus: 'active',
-    trialEndsAt: null,
-    status: 'active',
-  });
-  console.log(`Created Agency ${agency._id} (${agency.companyName})`);
-
+  console.log(`Created Agency ${result.agencyId} (DreamHomes)`);
   console.log('Backfilling agencyId onto existing records...');
-  const [userResult, propertyResult, inquiryResult] = await Promise.all([
-    // Exclude super_admin explicitly: querying agencyId: null also
-    // matches documents where the field is entirely absent (which is
-    // every pre-migration user), and a super_admin provisioned before
-    // this migration runs must stay agencyId: null, not be pulled into
-    // the seed agency.
-    User.updateMany({ agencyId: null, role: { $ne: 'super_admin' } }, { $set: { agencyId: agency._id } }),
-    Property.updateMany({ agencyId: { $exists: false } }, { $set: { agencyId: agency._id } }),
-    Inquiry.updateMany({ agencyId: { $exists: false } }, { $set: { agencyId: agency._id } }),
-  ]);
-  console.log(`  Users:      ${userResult.modifiedCount} updated`);
-  console.log(`  Properties: ${propertyResult.modifiedCount} updated`);
-  console.log(`  Inquiries:  ${inquiryResult.modifiedCount} updated`);
-
-  console.log('Remapping role "admin" -> "agency_admin"...');
-  const roleResult = await User.updateMany({ role: 'admin' }, { $set: { role: 'agency_admin' } });
-  console.log(`  ${roleResult.modifiedCount} user(s) remapped`);
-
-  console.log('Reconciling indexes with current schema...');
-  await Promise.all([
-    Agency.syncIndexes(),
-    User.syncIndexes(),
-    Property.syncIndexes(),
-    Inquiry.syncIndexes(),
-  ]);
-
+  console.log(`  Users:      ${result.usersUpdated} updated`);
+  console.log(`  Properties: ${result.propertiesUpdated} updated`);
+  console.log(`  Inquiries:  ${result.inquiriesUpdated} updated`);
+  console.log(`Remapping role "admin" -> "agency_admin"... ${result.rolesRemapped} user(s) remapped`);
   console.log('\nMigration complete.');
   console.log('Note: no super_admin account was created - provision one deliberately');
   console.log('via a separate script before building Feature 5 (platform routes).');
