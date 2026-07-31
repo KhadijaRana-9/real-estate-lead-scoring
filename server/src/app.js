@@ -15,7 +15,6 @@ const crmRoutes = require('./features/crm/crm.routes');
 const billingRoutes = require('./features/billing/billing.routes');
 const reportsRoutes = require('./features/reports/reports.routes');
 const auditRoutes = require('./features/audit/audit.routes');
-const opsRoutes = require('./features/ops/ops.routes');
 const { notFound, errorHandler } = require('./shared/middleware/error');
 const { apiLimiter } = require('./shared/middleware/rateLimiters');
 
@@ -53,7 +52,6 @@ function createApp(env) {
   app.use('/api/agency', agencyRoutes);
   app.use('/api/agencies', marketplaceRoutes);
   app.use('/api/audit', auditRoutes);
-  app.use('/api/ops', opsRoutes);
 
   app.use(notFound);
   app.use(errorHandler);
