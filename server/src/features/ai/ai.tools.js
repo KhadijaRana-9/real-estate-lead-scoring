@@ -10,6 +10,11 @@ const billingService = require('../billing/billing.service');
 const crmService = require('../crm/crm.service');
 const authService = require('../auth/auth.service');
 const auditLogService = require('../audit/auditLog.service');
+const agencyDirectoryService = require('../marketplace/agencyDirectory.service');
+const developerService = require('../developer/developer.service');
+const projectService = require('../project/project.service');
+const blogService = require('../blog/blog.service');
+const marketService = require('../market/market.service');
 
 // Every tool the model can call. `roles` is the actual authorization
 // boundary - not a suggestion to the model. Regardless of what a
@@ -250,6 +255,80 @@ const TOOL_DEFINITIONS = {
     parameters: { type: 'object', properties: {} },
     roles: ['agent', 'agency_admin'],
   },
+
+  // ---- Marketplace (public, cross-tenant - every agency on the
+  // platform, not just the requester's own workspace) ----
+  search_agencies: {
+    name: 'search_agencies',
+    description: 'Search real estate agencies on the platform by city or name, with real stats (rating, trust score, listing count).',
+    parameters: {
+      type: 'object',
+      properties: {
+        city: { type: 'string' },
+        search: { type: 'string', description: 'Agency name or partial name' },
+        verifiedOnly: { type: 'boolean' },
+      },
+    },
+    roles: ['customer', 'agent', 'agency_admin', 'super_admin'],
+  },
+  get_agency_details: {
+    name: 'get_agency_details',
+    description: "Get one agency's full public profile: trust score breakdown, rating, listings, agents, reviews summary.",
+    parameters: {
+      type: 'object',
+      properties: { agencySlug: { type: 'string' }, agencyName: { type: 'string' } },
+    },
+    roles: ['customer', 'agent', 'agency_admin', 'super_admin'],
+  },
+  search_developers: {
+    name: 'search_developers',
+    description: 'Search real estate developers on the platform (companies building projects) by city or name.',
+    parameters: {
+      type: 'object',
+      properties: { city: { type: 'string' }, search: { type: 'string' } },
+    },
+    roles: ['customer', 'agent', 'agency_admin', 'super_admin'],
+  },
+  search_projects: {
+    name: 'search_projects',
+    description: 'Search development projects (housing schemes/towers) by city, status (upcoming/under_construction/launched/completed), or name.',
+    parameters: {
+      type: 'object',
+      properties: {
+        city: { type: 'string' },
+        status: { type: 'string', enum: ['upcoming', 'under_construction', 'launched', 'completed'] },
+        search: { type: 'string' },
+      },
+    },
+    roles: ['customer', 'agent', 'agency_admin', 'super_admin'],
+  },
+  get_market_insights: {
+    name: 'get_market_insights',
+    description: 'Get real market data: average prices by city and property type, or a 12-month price trend for one specific city.',
+    parameters: {
+      type: 'object',
+      properties: { city: { type: 'string', description: 'Omit for the platform-wide overview by city and type' } },
+    },
+    roles: ['customer', 'agent', 'agency_admin', 'super_admin'],
+  },
+  search_blog_posts: {
+    name: 'search_blog_posts',
+    description: 'Search published blog/news articles (market news, buying/selling guides, investment, legal) by keyword or category.',
+    parameters: {
+      type: 'object',
+      properties: {
+        search: { type: 'string' },
+        category: { type: 'string', enum: ['market-news', 'buying-guide', 'selling-guide', 'investment', 'lifestyle', 'agency-news', 'legal'] },
+      },
+    },
+    roles: ['customer', 'agent', 'agency_admin', 'super_admin'],
+  },
+  get_marketplace_stats: {
+    name: 'get_marketplace_stats',
+    description: 'Get real, platform-wide public marketplace totals: total agencies, properties, agents, and cities covered.',
+    parameters: { type: 'object', properties: {} },
+    roles: ['customer', 'agent', 'agency_admin', 'super_admin'],
+  },
 };
 
 function getToolsForRole(role) {
@@ -430,6 +509,60 @@ const EXECUTORS = {
   async get_upcoming_reminders(_args, ctx) {
     const result = await crmService.getUpcomingReminders(ctx.tenantId, ctx.requester);
     return { renderAs: 'reminders', ...result };
+  },
+
+  async search_agencies(args) {
+    const result = await agencyDirectoryService.listAgencies({
+      city: args.city,
+      search: args.search,
+      verified: args.verifiedOnly ? 'true' : undefined,
+      limit: 8,
+    });
+    return { renderAs: 'agency_cards', count: result.items.length, agencies: result.items };
+  },
+
+  async get_agency_details(args, ctx) {
+    let slug = args.agencySlug;
+    if (!slug && args.agencyName) {
+      const found = await agencyDirectoryService.listAgencies({ search: args.agencyName, limit: 1 });
+      slug = found.items[0]?.slug;
+    }
+    if (!slug) return { error: 'Which agency? Give me its name.' };
+    try {
+      const profile = await agencyDirectoryService.getAgencyProfile(slug, ctx.requester?.id);
+      return { renderAs: 'agency_details', ...profile };
+    } catch {
+      return { error: `Couldn't find an agency matching "${args.agencyName || slug}".` };
+    }
+  },
+
+  async search_developers(args) {
+    const result = await developerService.list({ city: args.city, search: args.search, limit: 8 });
+    return { renderAs: 'developer_cards', count: result.items.length, developers: result.items };
+  },
+
+  async search_projects(args) {
+    const result = await projectService.list({ city: args.city, status: args.status, search: args.search, limit: 8 });
+    return { renderAs: 'project_cards', count: result.items.length, projects: result.items };
+  },
+
+  async get_market_insights(args) {
+    if (args.city) {
+      const insight = await marketService.cityInsight(args.city);
+      return { renderAs: 'market_insight', ...insight };
+    }
+    const overview = await marketService.overview();
+    return { renderAs: 'market_overview', ...overview };
+  },
+
+  async search_blog_posts(args) {
+    const result = await blogService.listPublic({ search: args.search, category: args.category, limit: 6 });
+    return { renderAs: 'blog_cards', count: result.items.length, posts: result.items };
+  },
+
+  async get_marketplace_stats() {
+    const stats = await agencyDirectoryService.getPublicPlatformStats();
+    return { renderAs: 'marketplace_stats', ...stats };
   },
 };
 

@@ -31,4 +31,12 @@ async function getFollowerCountsForMany(agencyIds) {
   }, {});
 }
 
-module.exports = { follow, unfollow, isFollowing, getFollowerCount, getFollowerCountsForMany };
+// Batch "which of these agencies does this one user follow" - a single
+// query for a whole card list, not one isFollowing() call per card.
+async function getFollowingSetForMany(agencyIds, userId) {
+  if (!userId) return new Set();
+  const docs = await Follow.find({ agencyId: { $in: agencyIds }, user: userId }).select('agencyId');
+  return new Set(docs.map((d) => d.agencyId.toString()));
+}
+
+module.exports = { follow, unfollow, isFollowing, getFollowerCount, getFollowerCountsForMany, getFollowingSetForMany };

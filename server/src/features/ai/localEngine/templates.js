@@ -31,6 +31,18 @@ const REPLIERS = {
   list_appointments: (r) => (r.count ? `You have ${r.count} appointment${r.count === 1 ? '' : 's'}.` : 'No appointments scheduled.'),
   create_appointment: (r) => `Scheduled "${r.appointments[0].title}" for ${new Date(r.appointments[0].scheduledAt).toLocaleString()}.`,
   get_upcoming_reminders: (r) => `${r.overdueTasks.length} overdue, ${r.dueSoonTasks.length} due soon, ${r.upcomingAppointments.length} appointments in the next ${r.windowHours}h.`,
+  search_agencies: (r) => (r.count ? `Found ${r.count} agenc${r.count === 1 ? 'y' : 'ies'}.` : "I didn't find any agencies matching that - try a different city or name."),
+  get_agency_details: (r) => `${r.companyName} - Trust Score ${r.stats?.trustScore ?? 'n/a'}/100, ${r.stats?.activeListings ?? 0} active listings, ${r.stats?.reviewCount ? `rated ${r.stats.rating}/5 from ${r.stats.reviewCount} reviews` : 'no reviews yet'}.`,
+  search_developers: (r) => (r.count ? `Found ${r.count} developer${r.count === 1 ? '' : 's'}.` : "I didn't find any developers matching that."),
+  search_projects: (r) => (r.count ? `Found ${r.count} project${r.count === 1 ? '' : 's'}.` : "I didn't find any projects matching that."),
+  get_market_insights: (r) =>
+    r.city
+      ? r.available
+        ? `${r.city}: average price ${money(r.avgPrice)} across ${r.listingCount} listings.`
+        : `Not enough listing data in ${r.city} yet for a reliable market read.`
+      : `Market overview across ${r.byCity?.length ?? 0} cities - ${r.totals?.totalActiveListings ?? 0} active listings, average price ${money(r.totals?.avgPrice)}.`,
+  search_blog_posts: (r) => (r.count ? `Found ${r.count} article${r.count === 1 ? '' : 's'}.` : "I didn't find any articles matching that."),
+  get_marketplace_stats: (r) => `${r.totalAgencies} agencies, ${r.totalProperties} properties, ${r.totalAgents} agents, across ${r.totalCities} cities.`,
 };
 
 function buildReply(tool, result) {

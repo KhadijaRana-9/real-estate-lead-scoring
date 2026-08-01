@@ -20,10 +20,12 @@ const router = express.Router();
 
 // Public, cross-tenant directory - deliberately NOT behind resolveTenant
 // (there is no single workspace here, this lists every agency on the
-// platform) and not behind auth (anonymous visitors browse it exactly
-// like Zameen/Bayut).
-router.get('/', validate(listAgenciesQuerySchema), controller.list);
-router.get('/sections', controller.homepageSections);
+// platform) and not behind (required) auth - anonymous visitors browse it
+// exactly like Zameen/Bayut. optionalAuth only decodes a token if one is
+// present, so a logged-in visitor's cards correctly show real
+// Follow/Following state without requiring login to browse at all.
+router.get('/', optionalAuth, validate(listAgenciesQuerySchema), controller.list);
+router.get('/sections', optionalAuth, controller.homepageSections);
 router.get('/platform-stats', controller.platformStats);
 router.get('/autocomplete', validate(autocompleteQuerySchema), controller.autocomplete);
 // Must stay before /:slug - otherwise Express matches "compare" as a slug.

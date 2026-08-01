@@ -179,6 +179,57 @@ const TOOL_INTENTS = [
     extract: () => ({}),
     requiredArgs: [],
   },
+  {
+    tool: 'search_agencies',
+    triggers: ['agencies in', 'agency in', 'find an agency', 'find agencies', 'recommend an agency', 'which agency', 'real estate agencies', 'real estate agency', 'trusted agency', 'trusted agencies', 'best agency', 'best agencies', 'verified agencies', 'verified agency'],
+    keywords: ['agency'],
+    extract: (t) => ({ city: e.extractCity(t), verifiedOnly: /\bverified\b/i.test(t) || undefined }),
+    requiredArgs: [],
+  },
+  {
+    tool: 'get_agency_details',
+    triggers: ['tell me about agency', 'about this agency', 'agency profile', 'agency called', 'trust score for', 'trust score of', "agency's trust score"],
+    extract: (t) => ({ agencyName: e.extractQuoted(t) || e.extractTitleAfter(t, ['tell me about agency', 'about this agency', 'agency called', 'trust score for', 'trust score of']) }),
+    requiredArgs: ['agencyName'],
+    clarify: 'Which agency? Tell me its name.',
+  },
+  {
+    tool: 'search_developers',
+    triggers: ['developers in', 'developer in', 'real estate developers', 'top developers', 'find a developer', 'find developers', 'construction company', 'construction companies'],
+    keywords: ['developer', 'developers'],
+    extract: (t) => ({ city: e.extractCity(t) }),
+    requiredArgs: [],
+  },
+  {
+    tool: 'search_projects',
+    triggers: ['projects in', 'project in', 'housing scheme', 'housing schemes', 'new launches', 'upcoming projects', 'under construction projects', 'find a project', 'development project', 'development projects'],
+    keywords: ['project', 'projects'],
+    extract: (t) => ({
+      city: e.extractCity(t),
+      status: /\bupcoming\b/i.test(t) ? 'upcoming' : /\bunder construction\b/i.test(t) ? 'under_construction' : /\blaunched\b/i.test(t) ? 'launched' : /\bcompleted\b/i.test(t) ? 'completed' : undefined,
+    }),
+    requiredArgs: [],
+  },
+  {
+    tool: 'get_market_insights',
+    triggers: ['market insight', 'market insights', 'market trend', 'market trends', 'price trend', 'price index', 'average price in', 'average prices', 'how is the market', 'market overview', 'property prices in'],
+    keywords: ['market'],
+    extract: (t) => ({ city: e.extractCity(t) }),
+    requiredArgs: [],
+  },
+  {
+    tool: 'search_blog_posts',
+    triggers: ['blog post', 'blog posts', 'news article', 'buying guide', 'selling guide', 'read about', 'articles about'],
+    keywords: ['blog', 'article', 'articles'],
+    extract: (t) => ({ search: e.extractQuoted(t) }),
+    requiredArgs: [],
+  },
+  {
+    tool: 'get_marketplace_stats',
+    triggers: ['how many properties on the platform', 'how many listings on the platform', 'platform totals', 'marketplace stats', 'marketplace statistics', 'how big is the platform', 'total listings', 'cities covered'],
+    extract: () => ({}),
+    requiredArgs: [],
+  },
 ];
 
 function findByTool(name) {

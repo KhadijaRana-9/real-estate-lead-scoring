@@ -32,17 +32,22 @@ function computeTrustScore(agency, stats) {
 // Attaches the same real, live-aggregated stats block to every agency
 // card regardless of which list it came from (directory, featured,
 // top-performing, ...) - one source of truth for "what a card shows".
-async function attachStats(agencies) {
+// requesterId is optional (anonymous browsing) - when present, each
+// agency also gets a real isFollowing flag so list/strip cards can show
+// an accurate Follow/Following state, not just the single-agency profile
+// page.
+async function attachStats(agencies, requesterId) {
   const agencyIds = agencies.map((a) => a._id);
   if (agencyIds.length === 0) return [];
 
-  const [listingCounts, soldCounts, agentCounts, viewsAgg, ratings, followerCounts] = await Promise.all([
+  const [listingCounts, soldCounts, agentCounts, viewsAgg, ratings, followerCounts, followingSet] = await Promise.all([
     Property.aggregate([{ $match: { agencyId: { $in: agencyIds }, status: 'available' } }, { $group: { _id: '$agencyId', count: { $sum: 1 } } }]),
     Property.aggregate([{ $match: { agencyId: { $in: agencyIds }, status: 'sold' } }, { $group: { _id: '$agencyId', count: { $sum: 1 } } }]),
     User.aggregate([{ $match: { agencyId: { $in: agencyIds }, role: 'agent' } }, { $group: { _id: '$agencyId', count: { $sum: 1 } } }]),
     Property.aggregate([{ $match: { agencyId: { $in: agencyIds } } }, { $group: { _id: '$agencyId', totalViews: { $sum: '$views' } } }]),
     reviewService.getRatingSummaryForMany(agencyIds),
     followService.getFollowerCountsForMany(agencyIds),
+    followService.getFollowingSetForMany(agencyIds, requesterId),
   ]);
 
   const toMap = (rows) => new Map(rows.map((r) => [r._id.toString(), r.count]));
@@ -62,7 +67,11 @@ async function attachStats(agencies) {
       reviewCount: ratings[id]?.count || 0,
       followerCount: followerCounts[id] || 0,
     };
-    return { ...agency.toObject(), stats: { ...stats, trustScore: computeTrustScore(agency, stats) } };
+    return {
+      ...agency.toObject(),
+      isFollowing: followingSet.has(id),
+      stats: { ...stats, trustScore: computeTrustScore(agency, stats) },
+    };
   });
 }
 
@@ -80,7 +89,7 @@ const STAT_SORTS = {
   trust_score: (a, b) => b.stats.trustScore - a.stats.trustScore,
 };
 
-async function listAgencies({ search, city, verified, plan, sort = 'newest', page = 1, limit = 12 } = {}) {
+async function listAgencies({ search, city, verified, plan, sort = 'newest', page = 1, limit = 12 } = {}, requesterId) {
   const filter = { status: 'active' };
   if (city) filter.city = new RegExp(`^${city}$`, 'i');
   if (verified !== undefined) filter.verified = verified === 'true' || verified === true;
@@ -92,7 +101,7 @@ async function listAgencies({ search, city, verified, plan, sort = 'newest', pag
 
   if (STAT_SORTS[sort]) {
     const pool = await Agency.find(filter).select(PUBLIC_LIST_FIELDS).limit(500);
-    const poolWithStats = await attachStats(pool);
+    const poolWithStats = await attachStats(pool, requesterId);
     poolWithStats.sort(STAT_SORTS[sort]);
     const total = poolWithStats.length;
     const start = (pageNum - 1) * limitNum;
@@ -111,7 +120,7 @@ async function listAgencies({ search, city, verified, plan, sort = 'newest', pag
   ]);
 
   return {
-    items: await attachStats(items),
+    items: await attachStats(items, requesterId),
     pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) || 1 },
   };
 }
@@ -158,7 +167,7 @@ async function getPublicPlatformStats() {
 
 // The categorized strips - each backed by a real, distinct query, not a
 // slice of the same list relabeled six times.
-async function getHomepageSections() {
+async function getHomepageSections(requesterId) {
   const base = { status: 'active' };
 
   const [featured, newest, verifiedAgencies, premium, recentlyActiveAgg] = await Promise.all([
@@ -181,15 +190,15 @@ async function getHomepageSections() {
   // "Top performing" needs the views stat first, so compute stats once
   // for a broader pool and sort by it - cheaper than a second aggregate.
   const pool = await Agency.find(base).select(PUBLIC_LIST_FIELDS).limit(60);
-  const poolWithStats = await attachStats(pool);
+  const poolWithStats = await attachStats(pool, requesterId);
   const topPerforming = [...poolWithStats].sort((a, b) => b.stats.totalViews - a.stats.totalViews).slice(0, 8);
 
   const [featuredWithStats, newestWithStats, verifiedWithStats, premiumWithStats, recentlyActiveWithStats] = await Promise.all([
-    attachStats(featured),
-    attachStats(newest),
-    attachStats(verifiedAgencies),
-    attachStats(premium),
-    attachStats(orderedRecentlyActive),
+    attachStats(featured, requesterId),
+    attachStats(newest, requesterId),
+    attachStats(verifiedAgencies, requesterId),
+    attachStats(premium, requesterId),
+    attachStats(orderedRecentlyActive, requesterId),
   ]);
 
   return {
@@ -226,7 +235,7 @@ async function getAgencyProfile(slug, requesterId) {
     reviews,
     ratingDistribution,
     agents,
-    relatedAgencies: await attachStats(related),
+    relatedAgencies: await attachStats(related, requesterId),
     isFollowing: following,
   };
 }

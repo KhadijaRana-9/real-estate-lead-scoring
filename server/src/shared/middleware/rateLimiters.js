@@ -44,11 +44,16 @@ const inquiryLimiter = rateLimit({
   message: { message: 'Too many inquiries submitted. Please try again later.' },
 });
 
-// LLM calls cost real money per request - a much tighter cap than the
-// general API limiter, independent of it.
+// The AI Assistant (see features/ai) runs fully offline - local
+// keyword/entity matching against MongoDB-backed tools, no paid LLM API
+// call behind it - so this doesn't need the tight per-request cost
+// protection a real LLM integration would. Still capped independently of
+// the general API limiter as a backstop against a runaway client loop,
+// just at a limit generous enough for a normal back-and-forth
+// conversation not to trip it.
 const aiLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  limit: isTestEnv ? 100000 : 20,
+  limit: isTestEnv ? 100000 : 120,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: 'Too many AI requests. Please wait a few minutes and try again.' },

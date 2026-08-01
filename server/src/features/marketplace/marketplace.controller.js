@@ -6,7 +6,7 @@ const Agency = require('../agency/agency.model');
 
 async function list(req, res, next) {
   try {
-    const result = await directoryService.listAgencies(req.query);
+    const result = await directoryService.listAgencies(req.query, req.user?.id);
     res.json(result);
   } catch (err) {
     next(err);
@@ -15,7 +15,7 @@ async function list(req, res, next) {
 
 async function homepageSections(req, res, next) {
   try {
-    const result = await directoryService.getHomepageSections();
+    const result = await directoryService.getHomepageSections(req.user?.id);
     res.json(result);
   } catch (err) {
     next(err);
