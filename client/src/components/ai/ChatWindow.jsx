@@ -9,6 +9,7 @@ import ChatMessage from './ChatMessage'
 import ChatInput from './ChatInput'
 import TypingIndicator from './TypingIndicator'
 import SuggestedPrompts from './SuggestedPrompts'
+import AiOrb from './AiOrb'
 import { EASE } from '../../motion/variants'
 
 export default function ChatWindow({ onClose }) {
@@ -121,24 +122,40 @@ export default function ChatWindow({ onClose }) {
     }
   }
 
+  const firstName = user?.name ? user.name.split(' ')[0] : null
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 24, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 16, scale: 0.97 }}
       transition={{ duration: 0.25, ease: EASE }}
-      className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-white shadow-2xl sm:inset-auto sm:bottom-24 sm:right-6 sm:h-[600px] sm:max-h-[80vh] sm:w-96 sm:rounded-2xl sm:border sm:border-gray-200 dark:bg-gray-950 dark:sm:border-gray-800"
+      // Deliberately always dark, regardless of the site's own light/dark
+      // toggle - like Siri/Perplexity's assistant surface, this commits
+      // to one premium look rather than trying to keep a glowing orb
+      // readable against a white background. The literal `dark` class
+      // here (not just `dark:` utilities) cascades Tailwind's dark
+      // variant to every descendant via the `dark, .dark *` custom
+      // variant in index.css, so existing dark: styles throughout
+      // ChatMessage/SuggestedPrompts/etc. activate unconditionally.
+      className="dark fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#050807] shadow-2xl sm:inset-auto sm:bottom-24 sm:right-6 sm:h-[640px] sm:max-h-[80vh] sm:w-96 sm:rounded-3xl sm:border sm:border-white/10"
     >
-      <div className="flex items-center justify-between border-b border-gray-200 bg-white/80 px-4 py-3 backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
-        <button onClick={toggleSidebar} aria-label="Conversation history" className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
+      {/* Ambient glow backdrop */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-1/2 top-0 h-64 w-80 -translate-x-1/2 rounded-full bg-brand-500/20 blur-[80px]" />
+        <div className="absolute bottom-0 right-0 h-56 w-56 rounded-full bg-emerald-500/10 blur-[80px]" />
+      </div>
+
+      <div className="relative flex items-center justify-between border-b border-white/10 bg-white/[0.02] px-4 py-3 backdrop-blur-xl">
+        <button onClick={toggleSidebar} aria-label="Conversation history" className="rounded-lg p-1.5 text-white/70 hover:bg-white/10 hover:text-white">
           <FiMenu size={18} />
         </button>
-        <p className="text-sm font-semibold">AI Assistant</p>
+        <p className="text-sm font-semibold text-white">AI Assistant</p>
         <div className="flex items-center gap-1">
-          <button onClick={startNewConversation} aria-label="New conversation" className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800">
+          <button onClick={startNewConversation} aria-label="New conversation" className="rounded-lg p-1.5 text-white/70 hover:bg-white/10 hover:text-white">
             <FiPlus size={18} />
           </button>
-          <button onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 sm:hidden">
+          <button onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-white/70 hover:bg-white/10 hover:text-white sm:hidden">
             <FiX size={18} />
           </button>
         </div>
@@ -151,29 +168,29 @@ export default function ChatWindow({ onClose }) {
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ duration: 0.2 }}
-            className="absolute inset-0 z-10 overflow-y-auto bg-white p-2 dark:bg-gray-950"
+            className="absolute inset-0 z-10 overflow-y-auto bg-[#050807] p-2"
           >
             {loadingConversations ? (
               <div className="space-y-2 p-2">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="h-10 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+                  <div key={i} className="h-10 animate-pulse rounded-lg bg-white/5" />
                 ))}
               </div>
             ) : conversations.length === 0 ? (
-              <p className="p-4 text-center text-sm text-gray-400">No conversations yet</p>
+              <p className="p-4 text-center text-sm text-white/40">No conversations yet</p>
             ) : (
               conversations.map((c) => (
                 <button
                   key={c._id}
                   onClick={() => openConversation(c._id)}
-                  className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10"
                 >
                   <span className="truncate">{c.title}</span>
-                  <span className="flex shrink-0 gap-1 text-gray-400">
-                    <span onClick={(e) => togglePin(e, c)} className={c.pinned ? 'text-amber-500' : ''}>
+                  <span className="flex shrink-0 gap-1 text-white/40">
+                    <span onClick={(e) => togglePin(e, c)} className={c.pinned ? 'text-amber-400' : ''}>
                       <FiStar size={14} />
                     </span>
-                    <span onClick={(e) => deleteConversation(e, c._id)} className="hover:text-red-500">
+                    <span onClick={(e) => deleteConversation(e, c._id)} className="hover:text-red-400">
                       <FiTrash2 size={14} />
                     </span>
                   </span>
@@ -183,10 +200,14 @@ export default function ChatWindow({ onClose }) {
           </motion.div>
         )}
 
-        <div ref={scrollRef} className="h-full space-y-3 overflow-y-auto p-4">
+        <div ref={scrollRef} className="relative h-full space-y-3 overflow-y-auto p-4">
           {messages.length === 0 ? (
-            <div>
-              <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">Try asking:</p>
+            <div className="flex h-full flex-col items-center justify-center gap-6 px-2 text-center">
+              <AiOrb />
+              <div>
+                {firstName && <p className="text-sm text-white/50">Hello {firstName}</p>}
+                <p className="mt-1 text-xl font-semibold text-white">How can I help you today?</p>
+              </div>
               <SuggestedPrompts role={user?.role} onSelect={send} />
             </div>
           ) : (
@@ -202,7 +223,9 @@ export default function ChatWindow({ onClose }) {
         </div>
       </div>
 
-      <ChatInput onSend={send} disabled={streaming} />
+      <div className="relative">
+        <ChatInput onSend={send} disabled={streaming} />
+      </div>
     </motion.div>
   )
 }

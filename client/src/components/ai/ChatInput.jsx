@@ -25,41 +25,41 @@ export default function ChatInput({ onSend, disabled }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-end gap-2 border-t border-gray-200 p-3 dark:border-gray-800">
-      <textarea
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        rows={1}
-        placeholder={listening ? 'Listening...' : 'Ask about listings, leads, or your dashboard...'}
-        className="max-h-28 flex-1 resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-brand-400 dark:border-gray-700 dark:bg-gray-800"
-      />
-      {micSupported && (
+    <form onSubmit={handleSubmit} className="p-3">
+      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1.5 pl-5 pr-1.5 shadow-[0_0_25px_rgba(16,185,129,0.15)] backdrop-blur-xl">
+        <textarea
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={1}
+          placeholder={listening ? 'Listening...' : 'Ask anything...'}
+          className="max-h-24 flex-1 resize-none bg-transparent py-1.5 text-sm text-white placeholder-white/40 outline-none"
+        />
+        {micSupported && (
+          <motion.button
+            type="button"
+            onClick={listening ? stop : start}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            title={listening ? 'Stop listening' : 'Speak your question'}
+            aria-label={listening ? 'Stop voice input' : 'Start voice input'}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${
+              listening ? 'animate-pulse bg-red-500 text-white' : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
+            }`}
+          >
+            <FiMic size={15} />
+          </motion.button>
+        )}
         <motion.button
-          type="button"
-          onClick={listening ? stop : start}
+          type="submit"
+          disabled={disabled || !value.trim()}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          title={listening ? 'Stop listening' : 'Speak your question'}
-          aria-label={listening ? 'Stop voice input' : 'Start voice input'}
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-sm transition-colors ${
-            listening
-              ? 'animate-pulse border-red-400 bg-red-50 text-red-600 dark:border-red-700 dark:bg-red-950 dark:text-red-400'
-              : 'border-gray-200 bg-gray-50 text-gray-500 hover:text-brand-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400'
-          }`}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-emerald-600 text-white shadow-lg shadow-brand-500/30 disabled:opacity-30"
         >
-          <FiMic size={16} />
+          <FiSend size={14} />
         </motion.button>
-      )}
-      <motion.button
-        type="submit"
-        disabled={disabled || !value.trim()}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white disabled:opacity-40"
-      >
-        <FiSend size={16} />
-      </motion.button>
+      </div>
     </form>
   )
 }

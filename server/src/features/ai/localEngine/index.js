@@ -2,6 +2,7 @@ const { matchIntent } = require('./matcher');
 const { findByTool } = require('./toolIntents');
 const { buildReply, buildHelpMessage } = require('./templates');
 const { extractCity, extractType } = require('./entities');
+const { matchSmallTalk } = require('./smallTalk');
 const { getToolsForRole, executeTool } = require('../ai.tools');
 
 const CONTINUATION_RE = /\b(more|another|others?|else|again)\b/i;
@@ -17,6 +18,11 @@ const CONTINUATION_RE = /\b(more|another|others?|else|again)\b/i;
 // against a city mentioned a few turns ago without an LLM holding the
 // thread. Returns the updated memory so the caller can persist it.
 async function resolveMessage(message, ctx, memory = {}) {
+  const smallTalk = matchSmallTalk(message, ctx.requester);
+  if (smallTalk) {
+    return { text: smallTalk, attachments: [], memory };
+  }
+
   const toolsForRole = getToolsForRole(ctx.requester.role);
   const allowedNames = toolsForRole.map((t) => t.name);
   const nextMemory = { ...memory };

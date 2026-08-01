@@ -28,14 +28,15 @@ export default function SuggestedPrompts({ role, onSelect }) {
   const prompts = PROMPTS_BY_ROLE[role] || PROMPTS_BY_ROLE.customer
 
   return (
-    <motion.div initial="hidden" animate="visible" variants={staggerContainer(0.06)} className="space-y-2">
+    <motion.div initial="hidden" animate="visible" variants={staggerContainer(0.06)} className="flex flex-wrap justify-center gap-2">
       {prompts.map((prompt) => (
         <motion.button
           key={prompt}
           variants={staggerItem}
-          whileHover={{ scale: 1.02, x: 2 }}
+          whileHover={{ scale: 1.03, y: -1 }}
+          whileTap={{ scale: 0.97 }}
           onClick={() => onSelect(prompt)}
-          className="block w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left text-sm text-gray-700 hover:border-brand-400 hover:text-brand-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-brand-500 dark:hover:text-brand-300"
+          className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-left text-sm text-white/80 backdrop-blur-xl transition-colors hover:border-brand-400/50 hover:bg-white/10 hover:text-white"
         >
           {prompt}
         </motion.button>
