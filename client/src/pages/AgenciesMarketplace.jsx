@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FiGrid, FiList, FiMap, FiMenu, FiCheckCircle, FiAward, FiTrendingUp, FiClock, FiStar, FiBarChart2, FiX } from 'react-icons/fi'
+import { FiGrid, FiList, FiMap, FiMenu, FiCheckCircle, FiAward, FiTrendingUp, FiStar, FiBarChart2, FiX } from 'react-icons/fi'
 import * as api from '../api/endpoints'
 import AgencyCard from '../components/AgencyCard'
 import AgencyMarketplaceHero from '../components/AgencyMarketplaceHero'
 import AgencyMapView from '../components/AgencyMapView'
+import HeroNebula from '../components/HeroNebula'
 import SkeletonCard from '../components/SkeletonCard'
 import EmptyState from '../components/EmptyState'
 import Pagination from '../components/Pagination'
@@ -45,7 +46,7 @@ function SectionStrip({ title, icon: Icon, items, loading }) {
       <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-gray-50">
         <Icon className="text-brand-500" /> {title}
       </h2>
-      <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-2">
+      <div className="scrollbar-gradient-thin -mx-1 flex gap-4 overflow-x-auto px-1 pb-2">
         {loading
           ? Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="w-72 shrink-0">
@@ -151,15 +152,15 @@ export default function AgenciesMarketplace() {
   const gridClass = { grid: 'grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3', list: 'space-y-4', compact: 'space-y-2' }[view]
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+    <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="fixed inset-0 -z-10">
+        <HeroNebula />
+      </div>
+
       <AgencyMarketplaceHero onSearch={handleSearch} />
 
       {sections && !sectionsLoading && (
-        <>
-          <SectionStrip title="Featured Agencies" icon={FiAward} items={sections.featured} />
-          <SectionStrip title="Top Performing" icon={FiTrendingUp} items={sections.topPerforming} />
-          <SectionStrip title="Recently Active" icon={FiClock} items={sections.recentlyActive} />
-        </>
+        <SectionStrip title="Top Performing" icon={FiTrendingUp} items={sections.topPerforming} />
       )}
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-t border-gray-200 pt-8 dark:border-gray-800">

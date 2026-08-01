@@ -91,19 +91,7 @@ export default function AgencyMarketplaceHero({ onSearch }) {
     : []
 
   return (
-    <motion.div initial="hidden" animate="visible" variants={fadeUp} className="relative mb-10 overflow-hidden rounded-3xl border border-gray-200 bg-gradient-to-br from-brand-50 via-white to-brand-50 px-6 py-14 text-center dark:border-gray-800 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 sm:py-20">
-      {/* Floating decorative blobs */}
-      <motion.div
-        className="pointer-events-none absolute -left-20 -top-20 h-64 w-64 rounded-full bg-brand-300/20 blur-3xl dark:bg-brand-700/10"
-        animate={{ y: [0, 20, 0], x: [0, 15, 0] }}
-        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      <motion.div
-        className="pointer-events-none absolute -bottom-24 -right-16 h-72 w-72 rounded-full bg-sky-300/20 blur-3xl dark:bg-sky-700/10"
-        animate={{ y: [0, -20, 0], x: [0, -15, 0] }}
-        transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
-      />
-
+    <motion.div initial="hidden" animate="visible" variants={fadeUp} className="relative mb-10 px-6 py-14 text-center sm:py-20">
       <div className="relative">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50 sm:text-4xl lg:text-5xl">
           Find a Trusted Real Estate Agency

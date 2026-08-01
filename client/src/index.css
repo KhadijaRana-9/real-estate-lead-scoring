@@ -73,3 +73,28 @@ h1, h2, h3, h4 {
     radial-gradient(circle at 85% 15%, color-mix(in oklab, #1d4ed8 30%, transparent) 0%, transparent 45%),
     radial-gradient(circle at 50% 90%, color-mix(in oklab, var(--color-brand-800) 30%, transparent) 0%, transparent 50%);
 }
+
+/* Thin gradient scrollbar (matches ScrollProgressBar's brand->blue
+   gradient) for horizontally-scrolling card strips, in place of the
+   chunky native OS scrollbar. */
+.scrollbar-gradient-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-brand-400) transparent;
+}
+
+.scrollbar-gradient-thin::-webkit-scrollbar {
+  height: 6px;
+}
+
+.scrollbar-gradient-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-gradient-thin::-webkit-scrollbar-thumb {
+  background: linear-gradient(to right, var(--color-brand-400), #60a5fa);
+  border-radius: 9999px;
+}
+
+.scrollbar-gradient-thin::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to right, var(--color-brand-500), #3b82f6);
+}

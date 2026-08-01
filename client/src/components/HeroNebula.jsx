@@ -10,23 +10,25 @@ export default function HeroNebula() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden bg-white dark:bg-[#08070f]">
       {/* Radial glow, centered - the "depth" layer */}
-      <div className="absolute left-1/2 top-0 h-[40rem] w-[60rem] -translate-x-1/2 bg-[radial-gradient(ellipse_at_top,theme(colors.brand.200/40%),transparent_65%)] dark:bg-[radial-gradient(ellipse_at_top,theme(colors.brand.900/50%),transparent_65%)]" />
+      <div className="absolute left-1/2 top-0 h-[40rem] w-[60rem] -translate-x-1/2 bg-[radial-gradient(ellipse_at_top,theme(colors.brand.300/55%),transparent_65%)] dark:bg-[radial-gradient(ellipse_at_top,theme(colors.brand.400/40%),transparent_65%)]" />
 
-      {/* Large soft blobs, slow drift */}
+      {/* Large soft blobs, continuously orbiting (not a back-and-forth
+          wobble that stalls at each end - a real closed loop of keyframe
+          points traced with linear easing so it never pauses). */}
       <motion.div
-        className="absolute -left-40 top-10 h-[26rem] w-[26rem] rounded-full bg-brand-300/25 blur-[110px] dark:bg-brand-700/25"
-        animate={{ x: [0, 30, 0], y: [0, 20, 0] }}
-        transition={{ duration: 26, repeat: Infinity, ease: 'easeInOut' }}
+        className="absolute -left-40 top-10 h-[26rem] w-[26rem] rounded-full bg-brand-400/45 blur-[100px] dark:bg-emerald-400/40"
+        animate={{ x: [0, 60, 30, -30, 0], y: [0, 40, 80, 40, 0] }}
+        transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
       />
       <motion.div
-        className="absolute right-[-8%] top-[-4%] h-[24rem] w-[24rem] rounded-full bg-blue-300/20 blur-[110px] dark:bg-indigo-700/20"
-        animate={{ x: [0, -25, 0], y: [0, 25, 0] }}
-        transition={{ duration: 30, repeat: Infinity, ease: 'easeInOut' }}
+        className="absolute right-[-8%] top-[-4%] h-[24rem] w-[24rem] rounded-full bg-blue-400/35 blur-[100px] dark:bg-teal-400/35"
+        animate={{ x: [0, -50, -70, -30, 0], y: [0, 50, 10, -30, 0] }}
+        transition={{ duration: 22, repeat: Infinity, ease: 'linear' }}
       />
       <motion.div
-        className="absolute bottom-[-15%] left-1/3 h-80 w-80 rounded-full bg-teal-200/20 blur-[100px] dark:bg-teal-800/20"
-        animate={{ x: [0, 20, 0], y: [0, -15, 0] }}
-        transition={{ duration: 24, repeat: Infinity, ease: 'easeInOut' }}
+        className="absolute bottom-[-15%] left-1/3 h-80 w-80 rounded-full bg-teal-400/35 blur-[90px] dark:bg-emerald-500/35"
+        animate={{ x: [0, 40, 60, 20, 0], y: [0, -35, -10, 25, 0] }}
+        transition={{ duration: 16, repeat: Infinity, ease: 'linear' }}
       />
 
       {/* Faint grain for depth - cheap inline SVG turbulence, no asset request */}

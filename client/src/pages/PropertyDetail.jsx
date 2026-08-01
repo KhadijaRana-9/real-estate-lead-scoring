@@ -17,6 +17,7 @@ import PropertyCard from '../components/PropertyCard'
 import MediaGallery from '../components/propertyDetail/MediaGallery'
 import MortgageCalculator from '../components/propertyDetail/MortgageCalculator'
 import NearbyPlaces from '../components/propertyDetail/NearbyPlaces'
+import PriceTrendChart from '../components/propertyDetail/PriceTrendChart'
 import useWishlist from '../hooks/useWishlist'
 import useCompareList from '../hooks/useCompareList'
 import { formatPKR, formatDate } from '../utils/format'
@@ -32,6 +33,13 @@ const TIMELINE_OPTIONS = [
 ]
 
 const CONDITION_LABEL = { ready: 'Ready to Move', under_construction: 'Under Construction', new: 'Brand New', used: 'Used' }
+
+const TABS = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'location', label: 'Location & Nearby' },
+  { key: 'finance', label: 'Home Finance' },
+  { key: 'price', label: 'Price Index' },
+]
 
 function SpecItem({ icon: Icon, label, value }) {
   if (value === undefined || value === null || value === '') return null
@@ -172,6 +180,7 @@ export default function PropertyDetail() {
 
   const { isSaved, toggle: toggleWishlist } = useWishlist(id)
   const { isInCompare, toggle: toggleCompare, maxReached } = useCompareList(id)
+  const [activeTab, setActiveTab] = useState('overview')
 
   const {
     register,
@@ -186,6 +195,7 @@ export default function PropertyDetail() {
     setSimilar(null)
     setSameAgent(null)
     setSameAgency(null)
+    setActiveTab('overview')
     api
       .getProperty(id)
       .then(({ data }) => {
@@ -314,64 +324,94 @@ export default function PropertyDetail() {
             {property.description && <p className="mt-4 leading-relaxed text-gray-600 dark:text-gray-300">{property.description}</p>}
           </motion.div>
 
-          {/* Specifications */}
-          <section>
-            <h2 className="mb-3 text-lg font-bold">Property Overview</h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <SpecItem icon={FiLayers} label="Floors" value={property.floors || undefined} />
-              <SpecItem icon={FiCalendar} label="Year Built" value={property.constructionYear || undefined} />
-              <SpecItem icon={FiCheckSquare} label="Condition" value={CONDITION_LABEL[property.condition]} />
-              <SpecItem icon={FiHome} label="Category" value={property.category && property.category[0].toUpperCase() + property.category.slice(1)} />
-              <SpecItem icon={FiCompass} label="Locality" value={property.locality || undefined} />
-              <SpecItem icon={FiDollarSign} label="Maintenance" value={property.maintenanceCharges ? formatPKR(property.maintenanceCharges) + '/mo' : undefined} />
+          {/* Tabs - mirrors a real property portal's navigation: everything
+              about the listing itself under Overview, then dedicated tabs
+              for the heavier tools (map, mortgage calculator, price trend)
+              instead of one long undifferentiated scroll. */}
+          <div className="sticky top-16 z-10 -mx-4 border-b border-gray-200 bg-white/90 px-4 backdrop-blur print:hidden sm:mx-0 sm:rounded-xl sm:border sm:px-2 sm:py-1 dark:border-gray-800 dark:bg-gray-950/90">
+            <div className="scrollbar-gradient-thin flex gap-1 overflow-x-auto">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`shrink-0 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium transition-colors sm:py-2 ${
+                    activeTab === tab.key
+                      ? 'bg-brand-600 text-white'
+                      : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-900'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-          </section>
+          </div>
 
-          {/* Amenities - real data only, whatever the agent actually entered */}
-          {property.amenities?.length > 0 && (
-            <section>
-              <h2 className="mb-3 text-lg font-bold">Amenities &amp; Features</h2>
-              <div className="flex flex-wrap gap-2">
-                {property.amenities.map((a) => (
-                  <span key={a} className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-800">
-                    <FiCheckCircle className="text-brand-500" size={13} /> {a}
-                  </span>
-                ))}
-              </div>
-            </section>
-          )}
+          {activeTab === 'overview' && (
+            <>
+              {/* Specifications */}
+              <section>
+                <h2 className="mb-3 text-lg font-bold">Property Overview</h2>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <SpecItem icon={FiLayers} label="Floors" value={property.floors || undefined} />
+                  <SpecItem icon={FiCalendar} label="Year Built" value={property.constructionYear || undefined} />
+                  <SpecItem icon={FiCheckSquare} label="Condition" value={CONDITION_LABEL[property.condition]} />
+                  <SpecItem icon={FiHome} label="Category" value={property.category && property.category[0].toUpperCase() + property.category.slice(1)} />
+                  <SpecItem icon={FiCompass} label="Locality" value={property.locality || undefined} />
+                  <SpecItem icon={FiDollarSign} label="Maintenance" value={property.maintenanceCharges ? formatPKR(property.maintenanceCharges) + '/mo' : undefined} />
+                </div>
+              </section>
 
-          {/* Documents / Floor Plans */}
-          {property.documents?.length > 0 && (
-            <section>
-              <h2 className="mb-3 text-lg font-bold">Documents &amp; Floor Plans</h2>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {property.documents.map((doc, i) => (
-                  <a key={i} href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-gray-200 p-3 hover:border-brand-400 dark:border-gray-800">
-                    <FiFileText className="shrink-0 text-brand-500" size={18} />
-                    <span className="flex-1 truncate text-sm">{doc.name}</span>
-                    <FiDownload className="shrink-0 text-gray-400" size={14} />
+              {/* Amenities - real data only, whatever the agent actually entered */}
+              {property.amenities?.length > 0 && (
+                <section>
+                  <h2 className="mb-3 text-lg font-bold">Amenities &amp; Features</h2>
+                  <div className="flex flex-wrap gap-2">
+                    {property.amenities.map((a) => (
+                      <span key={a} className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-800">
+                        <FiCheckCircle className="text-brand-500" size={13} /> {a}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Documents / Floor Plans */}
+              {property.documents?.length > 0 && (
+                <section>
+                  <h2 className="mb-3 text-lg font-bold">Documents &amp; Floor Plans</h2>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {property.documents.map((doc, i) => (
+                      <a key={i} href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-gray-200 p-3 hover:border-brand-400 dark:border-gray-800">
+                        <FiFileText className="shrink-0 text-brand-500" size={18} />
+                        <span className="flex-1 truncate text-sm">{doc.name}</span>
+                        <FiDownload className="shrink-0 text-gray-400" size={14} />
+                      </a>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Virtual Tour */}
+              {property.virtualTourUrl && (
+                <section>
+                  <h2 className="mb-3 text-lg font-bold">Virtual Tour</h2>
+                  <a href={property.virtualTourUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center rounded-2xl border border-dashed border-brand-300 bg-brand-50 py-10 text-sm font-medium text-brand-700 hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-950/40 dark:text-brand-300">
+                    Open 360° Virtual Tour
                   </a>
-                ))}
-              </div>
-            </section>
+                </section>
+              )}
+
+              <AiPriceInsight property={property} />
+            </>
           )}
 
-          {/* Virtual Tour */}
-          {property.virtualTourUrl && (
-            <section>
-              <h2 className="mb-3 text-lg font-bold">Virtual Tour</h2>
-              <a href={property.virtualTourUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center rounded-2xl border border-dashed border-brand-300 bg-brand-50 py-10 text-sm font-medium text-brand-700 hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-950/40 dark:text-brand-300">
-                Open 360° Virtual Tour
-              </a>
-            </section>
+          {activeTab === 'location' && (
+            <NearbyPlaces location={property.location} address={`${property.locality || ''} ${property.city}`.trim()} />
           )}
 
-          <NearbyPlaces location={property.location} address={`${property.locality || ''} ${property.city}`.trim()} />
+          {activeTab === 'finance' && <MortgageCalculator price={property.price} />}
 
-          <MortgageCalculator price={property.price} />
-
-          <AiPriceInsight property={property} />
+          {activeTab === 'price' && <PriceTrendChart city={property.city} />}
 
           <RelatedSection title="Similar Properties" properties={similar} />
           <RelatedSection title="More From This Agent" properties={sameAgent} />

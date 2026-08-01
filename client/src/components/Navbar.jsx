@@ -48,7 +48,6 @@ export default function Navbar() {
     : [
         { to: '/listings', label: 'Buy' },
         { to: '/agencies', label: 'Agencies' },
-        { to: '/signup', label: 'For Agents' },
         { to: '/about', label: 'About' },
       ]
 

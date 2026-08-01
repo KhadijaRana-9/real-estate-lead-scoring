@@ -32,7 +32,17 @@ export async function streamChat({ message, conversationId, signal, onChunk, onM
   }
 
   if (!res.ok || !res.body) {
-    throw new Error('AI request failed')
+    // Surface the server's actual reason (e.g. "Too many AI requests -
+    // please wait a few minutes") instead of a generic message that hides
+    // what actually happened and how to fix it.
+    let serverMessage = null
+    try {
+      const body = await res.json()
+      serverMessage = body?.message
+    } catch {
+      /* response wasn't JSON - fall through to the generic message */
+    }
+    throw new Error(serverMessage || `AI request failed (${res.status})`)
   }
 
   const reader = res.body.getReader()

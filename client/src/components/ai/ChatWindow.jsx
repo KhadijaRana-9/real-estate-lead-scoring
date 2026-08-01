@@ -113,7 +113,7 @@ export default function ChatWindow({ onClose }) {
       })
     } catch (err) {
       if (err.name !== 'AbortError') {
-        toast.error('AI request failed - please try again')
+        toast.error(err.message || 'AI request failed - please try again')
         setMessages((prev) => prev.slice(0, -1))
       }
     } finally {

@@ -25,14 +25,19 @@ export default function About() {
       </motion.div>
 
       <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2">
-        {STEPS.map((step) => (
+        {STEPS.map((step, i) => (
           <div
             key={step.title}
-            className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"
+            className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"
           >
-            <div className="text-2xl text-brand-600 dark:text-brand-400">{step.icon}</div>
-            <h3 className="mt-3 font-semibold">{step.title}</h3>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{step.text}</p>
+            <motion.div
+              className="pointer-events-none absolute -left-10 -top-16 h-48 w-48 rounded-full bg-[radial-gradient(circle,theme(colors.brand.400/35%),theme(colors.sky.400/20%)_45%,transparent_70%)] blur-2xl dark:bg-[radial-gradient(circle,theme(colors.brand.400/25%),theme(colors.indigo.500/20%)_45%,transparent_70%)]"
+              animate={{ opacity: [0.5, 0.9, 0.5], scale: [1, 1.15, 1] }}
+              transition={{ duration: 6 + i, repeat: Infinity, ease: 'easeInOut' }}
+            />
+            <div className="relative text-2xl text-brand-600 dark:text-brand-400">{step.icon}</div>
+            <h3 className="relative mt-3 font-semibold">{step.title}</h3>
+            <p className="relative mt-1 text-sm text-gray-600 dark:text-gray-300">{step.text}</p>
           </div>
         ))}
       </div>

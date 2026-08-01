@@ -95,3 +95,9 @@ export const unfollowAgency = (slug) => api.delete(`/agencies/${slug}/follow`)
 
 export const getAgencyProfileSettings = () => api.get('/agency/profile')
 export const updateAgencyProfileSettings = (data) => api.patch('/agency/profile', data)
+
+// Market Insights - real, live aggregations over actual listing data
+// (see server/src/features/market). No workspace param - cross-tenant,
+// like the rest of the public marketplace surface.
+export const getMarketPriceTrend = (params) => api.get('/market/price-trend', { params })
+export const getMarketCityInsight = (city) => api.get(`/market/city/${encodeURIComponent(city)}`)
