@@ -1,5 +1,6 @@
 const express = require('express');
 const controller = require('./property.controller');
+const collectionsController = require('./collections.controller');
 const auth = require('../../shared/middleware/auth');
 const requireRole = require('../../shared/middleware/role');
 const validate = require('../../shared/middleware/validate');
@@ -20,6 +21,15 @@ const {
 } = require('./property.schema');
 
 const router = express.Router();
+
+// Public, cross-tenant homepage collections - deliberately registered
+// before the tenant-scoped routes below and NOT behind resolveTenant()
+// (see collections.service.js for why: these discover listings across
+// every agency, same posture as the marketplace directory).
+router.get('/collections/luxury', collectionsController.luxury);
+router.get('/collections/commercial', collectionsController.commercial);
+router.get('/collections/investment', collectionsController.investment);
+router.get('/collections/new-launches', collectionsController.newLaunches);
 
 // Public browsing routes: no req.user yet, so resolveTenant resolves
 // from host/workspace/default instead.

@@ -1,5 +1,6 @@
 const propertyRepository = require('./property.repository');
 const Agency = require('../agency/agency.model');
+const Project = require('../project/project.model');
 const { estimatePrice } = require('../../shared/utils/priceEstimate');
 const { pickAllowedFields } = require('../../shared/utils/whitelist');
 const { escapeRegExp } = require('../../shared/utils/regex');
@@ -35,6 +36,7 @@ const EDITABLE_PROPERTY_FIELDS = [
   'negotiable',
   'maintenanceCharges',
   'featured',
+  'projectId',
 ];
 
 // Required to move a draft to 'available'. Separate from Mongoose-level
@@ -163,12 +165,23 @@ async function createDraftProperty(tenantId, data, requester) {
   return property;
 }
 
+async function assertProjectBelongsToTenant(tenantId, projectId) {
+  if (!projectId) return; // null/undefined means "unlink" - always allowed
+  const project = await Project.findOne({ _id: projectId, agencyId: tenantId }).select('_id');
+  if (!project) {
+    const err = new Error('Project not found for this workspace');
+    err.status = 400;
+    throw err;
+  }
+}
+
 async function updateProperty(tenantId, id, data, requester) {
   const property = await propertyRepository.findById(tenantId, id);
   if (!property) throw notFound();
   assertOwnership(property, requester, 'You can only edit your own listings');
 
   const safeData = pickAllowedFields(data, EDITABLE_PROPERTY_FIELDS);
+  if ('projectId' in safeData) await assertProjectBelongsToTenant(tenantId, safeData.projectId);
   Object.assign(property, safeData);
   await property.save();
   auditLog.record({ tenantId, actor: requester, action: 'property.update', targetType: 'Property', targetId: property._id, metadata: { fields: Object.keys(safeData) } });

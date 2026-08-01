@@ -52,6 +52,7 @@ const propertyBodyShape = {
   negotiable: z.coerce.boolean().optional(),
   maintenanceCharges: z.coerce.number().nonnegative().optional(),
   featured: z.coerce.boolean().optional(),
+  projectId: objectIdSchema.nullable().optional(),
 };
 
 const createPropertySchema = {

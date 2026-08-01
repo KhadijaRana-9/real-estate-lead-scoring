@@ -1,6 +1,7 @@
 const directoryService = require('./agencyDirectory.service');
 const reviewService = require('../review/review.service');
 const followService = require('../follow/follow.service');
+const searchLogService = require('../searchLog/searchLog.service');
 const Agency = require('../agency/agency.model');
 
 async function list(req, res, next) {
@@ -33,6 +34,10 @@ async function profile(req, res, next) {
 async function autocomplete(req, res, next) {
   try {
     const result = await directoryService.autocomplete(req.query.q);
+    // Fire-and-forget: a real visitor search term, logged for the
+    // Trending/Popular Searches homepage sections. Never blocks or fails
+    // the actual autocomplete response.
+    searchLogService.record({ term: req.query.q, scope: 'agencies' });
     res.json(result);
   } catch (err) {
     next(err);

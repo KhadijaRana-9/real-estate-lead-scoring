@@ -66,6 +66,12 @@ const propertySchema = new mongoose.Schema(
     // seed.js) now sets this via a resolved tenant, so it's safe to
     // enforce. See git history for the expand/backfill phase.
     agencyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agency', required: true, index: true },
+    // Optional link to a development project this unit belongs to (see
+    // ../project/project.model.js). A project's price range / unit
+    // counts / availability are always computed live from the properties
+    // that point back at it here, never manually duplicated on the
+    // project document itself.
+    projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', default: null, index: true },
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '' },
     // price/city/area are NOT required at the schema level (relaxed from

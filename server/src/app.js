@@ -15,6 +15,15 @@ const crmRoutes = require('./features/crm/crm.routes');
 const billingRoutes = require('./features/billing/billing.routes');
 const reportsRoutes = require('./features/reports/reports.routes');
 const auditRoutes = require('./features/audit/audit.routes');
+const developerRoutes = require('./features/developer/developer.routes');
+const projectRoutes = require('./features/project/project.routes');
+const blogRoutes = require('./features/blog/blog.routes');
+const successStoryRoutes = require('./features/successStory/successStory.routes');
+const awardRoutes = require('./features/award/award.routes');
+const partnerRoutes = require('./features/partner/partner.routes');
+const newsletterRoutes = require('./features/newsletter/newsletter.routes');
+const searchLogRoutes = require('./features/searchLog/searchLog.routes');
+const marketRoutes = require('./features/market/market.routes');
 const { notFound, errorHandler } = require('./shared/middleware/error');
 const { apiLimiter } = require('./shared/middleware/rateLimiters');
 
@@ -52,6 +61,15 @@ function createApp(env) {
   app.use('/api/agency', agencyRoutes);
   app.use('/api/agencies', marketplaceRoutes);
   app.use('/api/audit', auditRoutes);
+  app.use('/api/developers', developerRoutes);
+  app.use('/api/projects', projectRoutes);
+  app.use('/api/blog', blogRoutes);
+  app.use('/api/success-stories', successStoryRoutes);
+  app.use('/api/awards', awardRoutes);
+  app.use('/api/partners', partnerRoutes);
+  app.use('/api/newsletter', newsletterRoutes);
+  app.use('/api/search-log', searchLogRoutes);
+  app.use('/api/market', marketRoutes);
 
   app.use(notFound);
   app.use(errorHandler);
