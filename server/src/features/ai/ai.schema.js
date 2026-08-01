@@ -5,7 +5,13 @@ const objectIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
 const chatMessageSchema = {
   body: z.object({
     message: z.string().trim().min(1, 'Message is required').max(4000, 'Message is too long'),
-    conversationId: objectIdSchema.optional(),
+    // .nullable() in addition to .optional(): the client sends an
+    // explicit `conversationId: null` for a brand-new conversation (that
+    // survives JSON.stringify, unlike `undefined`, which gets dropped),
+    // and .optional() alone only tolerates the key being absent, not
+    // present-with-null - every first message of a new chat was failing
+    // validation here.
+    conversationId: objectIdSchema.nullable().optional(),
   }),
 };
 
