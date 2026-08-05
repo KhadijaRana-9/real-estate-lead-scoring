@@ -23,6 +23,14 @@ const marketService = require('../market/market.service');
 // (which comes from the authenticated request, never from the model),
 // so a jailbroken model still can't retrieve another agency's data or a
 // tool it isn't authorized for.
+//
+// `mutates: true` marks the (small, explicit) set of tools that change
+// data - only those get the confirm-before-executing gate in
+// localEngine/index.js. Deliberately opt-in, not opt-out: a tool with no
+// `mutates` field is treated as a safe read (see localEngine/index.js
+// and executeTool's timeout/retry policy below), so a newly-added tool
+// that forgets to think about this defaults to the *safer* behavior
+// (no auto-execute, retryable) rather than the riskier one.
 const TOOL_DEFINITIONS = {
   // ---- Property ----
   search_properties: {
@@ -127,6 +135,7 @@ const TOOL_DEFINITIONS = {
       required: ['inquiryId', 'stage'],
     },
     roles: ['agent', 'agency_admin'],
+    mutates: true,
   },
 
   // ---- Dashboard ----
@@ -227,6 +236,7 @@ const TOOL_DEFINITIONS = {
       required: ['title'],
     },
     roles: ['agent', 'agency_admin'],
+    mutates: true,
   },
   list_appointments: {
     name: 'list_appointments',
@@ -248,6 +258,7 @@ const TOOL_DEFINITIONS = {
       required: ['title', 'scheduledAt'],
     },
     roles: ['agent', 'agency_admin'],
+    mutates: true,
   },
   get_upcoming_reminders: {
     name: 'get_upcoming_reminders',
@@ -566,19 +577,109 @@ const EXECUTORS = {
   },
 };
 
+const TOOL_TIMEOUT_MS = 8000;
+const READ_RETRY_DELAY_MS = 200;
+// Only these arg names are ever eligible to become an audit log's
+// targetId, and only when they actually look like a real ObjectId -
+// never a raw string (city, title, ...) blindly cast at Mongoose.
+const TARGET_ID_ARG_KEYS = ['inquiryId', 'propertyId', 'propertyIds'];
+const OBJECT_ID_RE = /^[0-9a-fA-F]{24}$/;
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('tool_timeout')), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function likelyTargetId(args) {
+  for (const key of TARGET_ID_ARG_KEYS) {
+    const value = Array.isArray(args?.[key]) ? args[key][0] : args?.[key];
+    if (typeof value === 'string' && OBJECT_ID_RE.test(value)) return value;
+  }
+  return null;
+}
+
+// A SEPARATE audit trail from the business-level entries the underlying
+// services already write (e.g. inquiry.service.js's 'lead.stage_change')
+// - this one records the AI invocation itself (which tool, matched by
+// which role/tenant, how long it took, whether it succeeded), not the
+// business event. The two are complementary, not duplicates: a
+// move_lead_stage call now produces two audit rows - the existing
+// 'lead.stage_change' row (unchanged) plus this new 'ai.tool_call' row
+// tagged source: 'ai_chat'. Fire-and-forget from the caller's
+// perspective (auditLogService.record already swallows its own errors -
+// see audit/auditLog.service.js's own comment), but awaited here so a
+// log write always completes before the response goes out, same
+// convention every other service in this codebase follows.
+async function auditToolCall(name, args, ctx, { success, reason, durationMs }) {
+  await auditLogService.record({
+    tenantId: ctx.tenantId,
+    actor: ctx.requester,
+    action: 'ai.tool_call',
+    targetType: 'AiTool',
+    targetId: likelyTargetId(args),
+    metadata: {
+      source: 'ai_chat',
+      tool: name,
+      mutates: Boolean(TOOL_DEFINITIONS[name]?.mutates),
+      success,
+      reason,
+      durationMs,
+      args,
+    },
+  });
+}
+
 async function executeTool(name, args, ctx) {
   const definition = TOOL_DEFINITIONS[name];
   if (!definition || !definition.roles.includes(ctx.requester.role)) {
+    await auditToolCall(name, args, ctx, { success: false, reason: 'unauthorized' });
     return { error: 'This tool is not available for your role.' };
   }
   const executor = EXECUTORS[name];
-  if (!executor) return { error: 'Unknown tool.' };
+  if (!executor) {
+    await auditToolCall(name, args, ctx, { success: false, reason: 'unknown_tool' });
+    return { error: 'Unknown tool.' };
+  }
+
+  const isMutating = Boolean(definition.mutates);
+  const startedAt = Date.now();
+  let result;
+  let failureReason = null;
 
   try {
-    return await executor(args || {}, ctx);
-  } catch {
-    return { error: 'Tool execution failed.' };
+    result = await withTimeout(executor(args || {}, ctx), TOOL_TIMEOUT_MS);
+  } catch (err) {
+    failureReason = err.message === 'tool_timeout' ? 'timeout' : 'error';
+    // Reads get exactly one retry on a transient failure. Writes never
+    // auto-retry - a retried write could double-create a task or
+    // double-move a lead stage, which is worse than surfacing the
+    // failure and letting the user re-ask.
+    if (!isMutating) {
+      await delay(READ_RETRY_DELAY_MS);
+      try {
+        result = await withTimeout(executor(args || {}, ctx), TOOL_TIMEOUT_MS);
+        failureReason = null;
+      } catch (retryErr) {
+        failureReason = retryErr.message === 'tool_timeout' ? 'timeout' : 'error';
+      }
+    }
   }
+
+  const success = failureReason === null;
+  if (!success) {
+    result = { error: failureReason === 'timeout' ? 'That took too long to look up - please try again.' : 'Tool execution failed.' };
+  }
+
+  await auditToolCall(name, args, ctx, { success, reason: success ? undefined : failureReason, durationMs: Date.now() - startedAt });
+
+  return result;
 }
 
 module.exports = { getToolsForRole, executeTool, TOOL_DEFINITIONS };

@@ -45,6 +45,29 @@ const REPLIERS = {
   get_marketplace_stats: (r) => `${r.totalAgencies} agencies, ${r.totalProperties} properties, ${r.totalAgents} agents, across ${r.totalCities} cities.`,
 };
 
+// Human-readable description of what a mutating tool is about to do,
+// shown before it actually runs (see index.js's pendingAction gate).
+// Deliberately shows raw IDs rather than doing an extra lookup to
+// resolve a friendly name here - keeps this module a pure formatter with
+// no DB access, matching the rest of this file. A future pass could
+// have the caller resolve a name first and pass it in; not required for
+// the safety mechanism itself to work correctly.
+const CONFIRMATION_PROMPTS = {
+  move_lead_stage: (args) => `I'll move lead ${args.inquiryId} to "${String(args.stage).replace(/_/g, ' ')}". Reply "yes" to confirm, or "no" to cancel.`,
+  create_task: (args) => `I'll create a task: "${args.title}"${args.dueDate ? ` due ${new Date(args.dueDate).toLocaleDateString()}` : ''}. Reply "yes" to confirm, or "no" to cancel.`,
+  create_appointment: (args) => `I'll schedule "${args.title}" for ${new Date(args.scheduledAt).toLocaleString()}${args.location ? ` at ${args.location}` : ''}. Reply "yes" to confirm, or "no" to cancel.`,
+};
+
+function buildConfirmationPrompt(tool, args) {
+  const builder = CONFIRMATION_PROMPTS[tool];
+  if (!builder) return 'Reply "yes" to confirm this action, or "no" to cancel.';
+  try {
+    return builder(args);
+  } catch {
+    return 'Reply "yes" to confirm this action, or "no" to cancel.';
+  }
+}
+
 function buildReply(tool, result) {
   if (result?.error) return result.error;
   const replier = REPLIERS[tool];
@@ -72,4 +95,4 @@ function buildHelpMessage(role, toolsForRole) {
   ].join('\n');
 }
 
-module.exports = { buildReply, buildHelpMessage, money };
+module.exports = { buildReply, buildHelpMessage, buildConfirmationPrompt, money };
