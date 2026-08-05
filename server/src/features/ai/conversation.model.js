@@ -28,9 +28,25 @@ const conversationSchema = new mongoose.Schema(
     title: { type: String, trim: true, default: 'New conversation' },
     pinned: { type: Boolean, default: false },
     messages: { type: [messageSchema], default: [] },
-    // Lightweight offline "memory" - e.g. the last city mentioned - so a
-    // follow-up like "show me more options" can be resolved without an
-    // LLM to hold conversational context. See localEngine/index.js.
+    // Structured conversation memory - deliberately Mixed rather than a
+    // strict sub-schema, so new fields (see localEngine/memory.js) never
+    // require a migration for old conversations to keep working; a
+    // conversation saved before a field existed just has it undefined,
+    // which every reader already treats as "nothing remembered yet".
+    // Current shape (all optional):
+    //   lastCity, lastType, lastTool - Phase 1, unchanged
+    //   pendingAction: { tool, args } - Phase 1, unchanged (awaiting
+    //     confirmation on a write tool - see localEngine/index.js)
+    //   entities: { propertyId, inquiryId, agencySlug, developerSlug,
+    //     projectSlug, blogSlug } - real IDs of whatever was most
+    //     recently discussed, per kind
+    //   lastFilters - the args object from the last search-family tool
+    //     call, verbatim
+    //   recentToolResults: [{ tool, executedAt, success, summary,
+    //     identifiers }] - bounded to the last 5 (see
+    //     memory.js's MAX_RECENT_TOOL_RESULTS), compact summaries only,
+    //     never raw tool output
+    //   turnCount, needsSummarization - see localEngine/summarization.js
     context: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }

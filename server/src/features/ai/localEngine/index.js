@@ -4,6 +4,8 @@ const { buildReply, buildHelpMessage, buildConfirmationPrompt } = require('./tem
 const { extractCity, extractType } = require('./entities');
 const { matchSmallTalk } = require('./smallTalk');
 const { isAffirmative, isNegative } = require('./confirmations');
+const { recordToolExecution } = require('./memory');
+const { needsSummarization } = require('./summarization');
 const { getToolsForRole, executeTool, TOOL_DEFINITIONS } = require('../ai.tools');
 
 const CONTINUATION_RE = /\b(more|another|others?|else|again)\b/i;
@@ -14,26 +16,46 @@ const CONTINUATION_RE = /\b(more|another|others?|else|again)\b/i;
 // enforcement, and phrase the result. No LLM, no external API call, no
 // network round trip beyond MongoDB - this can run fully offline.
 //
-// `memory` is the conversation's small persisted context object
-// (Conversation.context) - it lets "show me more options" resolve
-// against a city mentioned a few turns ago without an LLM holding the
-// thread. Returns the updated memory so the caller can persist it.
+// `memory` is the conversation's structured context object
+// (Conversation.context), covering two generations of the same idea:
+//   - Phase 1 fields (lastCity/lastType/lastTool/pendingAction) - read
+//     and written exactly as before, unchanged by this phase.
+//   - Phase 2 fields (entities/lastFilters/recentToolResults/turnCount/
+//     needsSummarization) - see memory.js and summarization.js. These
+//     let a follow-up like "why is it performing well?" eventually be
+//     answered without re-asking which property was meant, once an LLM
+//     exists to actually reason over them (Phase 3). The deterministic
+//     engine here only *writes* them today; it doesn't read them back to
+//     change its own behavior, same as Phase 1 left `pendingAction` as
+//     write-then-read-next-turn but nothing fancier.
+// Returns the updated memory so the caller (ai.service.js) can persist
+// it verbatim - same contract as before, richer shape.
 async function resolveMessage(message, ctx, memory = {}) {
+  // turnCount/needsSummarization are computed once, up front, so every
+  // return path below carries them - regardless of whether this turn is
+  // small talk, a clarifying question, a confirmation, or a real tool
+  // call. A real, cheap counter; not a summary itself (see
+  // summarization.js for why one isn't generated here).
+  const turnCount = (memory.turnCount || 0) + 1;
+  const memoryBase = { ...memory, turnCount, needsSummarization: needsSummarization({ turnCount }) };
+
   // Confirmation gate for mutating tools (move_lead_stage/create_task/
   // create_appointment - see ai.tools.js's `mutates` flag). Checked
   // before small talk on purpose: "ok"/"sure" are recognized small-talk
   // words too (see smallTalk.js's THANKS_WORDS), and when there's a real
   // pending action those words must resolve as a confirmation, not get
   // swallowed by "You're welcome!".
-  if (memory?.pendingAction) {
-    const { tool, args } = memory.pendingAction;
-    const { pendingAction: _discard, ...clearedMemory } = memory;
+  if (memoryBase.pendingAction) {
+    const { tool, args } = memoryBase.pendingAction;
+    const { pendingAction: _discard, ...clearedMemory } = memoryBase;
 
     if (isAffirmative(message)) {
       const result = await executeTool(tool, args, ctx);
       const text = buildReply(tool, result);
       const attachments = result?.renderAs && !result.error ? [{ tool, renderAs: result.renderAs, data: result }] : [];
-      return { text, attachments, matchedTool: tool, memory: { ...clearedMemory, lastTool: result?.error ? clearedMemory.lastTool : tool } };
+      const updatedMemory = recordToolExecution(clearedMemory, tool, args, result);
+      if (!result?.error) updatedMemory.lastTool = tool;
+      return { text, attachments, matchedTool: tool, memory: updatedMemory };
     }
     if (isNegative(message)) {
       return { text: 'Cancelled - nothing was changed.', attachments: [], memory: clearedMemory };
@@ -43,6 +65,8 @@ async function resolveMessage(message, ctx, memory = {}) {
     // as a normal new request, rather than forcing an explicit cancel
     // first.
     memory = clearedMemory;
+  } else {
+    memory = memoryBase;
   }
 
   const smallTalk = matchSmallTalk(message, ctx.requester);
@@ -103,9 +127,10 @@ async function resolveMessage(message, ctx, memory = {}) {
   const text = buildReply(intent.tool, result);
   const attachments = result?.renderAs && !result.error ? [{ tool: intent.tool, renderAs: result.renderAs, data: result }] : [];
 
-  if (!result?.error) nextMemory.lastTool = intent.tool;
+  const updatedMemory = recordToolExecution(nextMemory, intent.tool, args, result);
+  if (!result?.error) updatedMemory.lastTool = intent.tool;
 
-  return { text, attachments, matchedTool: intent.tool, memory: nextMemory };
+  return { text, attachments, matchedTool: intent.tool, memory: updatedMemory };
 }
 
 module.exports = { resolveMessage };
