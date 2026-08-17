@@ -7,6 +7,17 @@ const followService = require('../follow/follow.service');
 const PUBLIC_LIST_FIELDS =
   'companyName slug logo coverBanner verified featured city country phone whatsapp contactEmail website subscriptionPlan establishedYear languages specializations createdAt officeLocations ceoMessage mission vision timeline awards officeGallery businessHours socialMedia description licenseNumber';
 
+// getAgencyProfile (the single-agency public page) needs everything the
+// list view does, plus `address` (rendered directly on the profile
+// page's Contact card and Maps link) and the branding colors (harmless
+// to expose, not currently rendered but genuinely public-facing data).
+// Deliberately excludes verificationDocuments, paymentStatus,
+// subscriptionStatus, billingCycle, trialEndsAt, customDomain,
+// rejectionReason/rejectedAt/approvedAt/approvedBy - internal
+// platform/billing/approval metadata that has no business being visible
+// to an anonymous visitor.
+const PUBLIC_PROFILE_FIELDS = `${PUBLIC_LIST_FIELDS} address primaryColor secondaryColor favicon`;
+
 const SORT_MAP = {
   newest: { createdAt: -1 },
   name_asc: { companyName: 1 },
@@ -212,7 +223,7 @@ async function getHomepageSections(requesterId) {
 }
 
 async function getAgencyProfile(slug, requesterId) {
-  const agency = await Agency.findOne({ slug, status: 'active' });
+  const agency = await Agency.findOne({ slug, status: 'active' }).select(PUBLIC_PROFILE_FIELDS);
   if (!agency) {
     const err = new Error('Agency not found');
     err.status = 404;

@@ -1,8 +1,13 @@
 import { useForm } from 'react-hook-form'
+import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { FiX } from 'react-icons/fi'
 import * as api from '../api/endpoints'
+import Input from './ui/Input'
+import Button from './ui/Button'
+import { EASE } from '../motion/variants'
 
-const PLANS = ['starter', 'professional', 'enterprise']
+const PLANS = ['trial', 'starter', 'professional', 'enterprise']
 
 export default function CreateAgencyModal({ onClose, onCreated }) {
   const {
@@ -22,63 +27,60 @@ export default function CreateAgencyModal({ onClose, onCreated }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 dark:bg-gray-900">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold">Create Agency</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">✕</button>
-        </div>
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.97, y: 8 }}
+          transition={{ duration: 0.2, ease: EASE }}
+          className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-800 dark:bg-gray-900"
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Create Agency</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+              <FiX size={18} />
+            </button>
+          </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <input
-              {...register('companyName', { required: 'Company name is required' })}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <Input
               placeholder="Company Name"
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
+              error={errors.companyName?.message}
+              {...register('companyName', { required: 'Company name is required' })}
             />
-            {errors.companyName && <p className="mt-1 text-xs text-red-500">{errors.companyName.message}</p>}
-          </div>
 
-          <div>
-            <input
-              {...register('slug', { required: 'Slug is required', pattern: { value: /^[a-z0-9-]+$/, message: 'Lowercase letters, numbers, and hyphens only' } })}
+            <Input
               placeholder="workspace-slug"
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
+              error={errors.slug?.message}
+              {...register('slug', { required: 'Slug is required', pattern: { value: /^[a-z0-9-]+$/, message: 'Lowercase letters, numbers, and hyphens only' } })}
             />
-            {errors.slug && <p className="mt-1 text-xs text-red-500">{errors.slug.message}</p>}
-          </div>
 
-          <div>
-            <input
-              {...register('contactEmail', { required: 'Contact email is required' })}
+            <Input
               type="email"
               placeholder="Contact Email"
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
+              error={errors.contactEmail?.message}
+              {...register('contactEmail', { required: 'Contact email is required' })}
             />
-            {errors.contactEmail && <p className="mt-1 text-xs text-red-500">{errors.contactEmail.message}</p>}
-          </div>
 
-          <select
-            {...register('subscriptionPlan')}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm capitalize dark:border-gray-700 dark:bg-gray-800"
-          >
-            {PLANS.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
+            <Input as="select" className="capitalize" {...register('subscriptionPlan')}>
+              {PLANS.map((p) => <option key={p} value={p}>{p}</option>)}
+            </Input>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className="rounded-lg border border-gray-300 px-4 py-2 text-sm dark:border-gray-700">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
-            >
-              {isSubmitting ? 'Creating...' : 'Create Agency'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" onClick={onClose} variant="outline">Cancel</Button>
+              <Button type="submit" loading={isSubmitting}>
+                {isSubmitting ? 'Creating...' : 'Create Agency'}
+              </Button>
+            </div>
+          </form>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   )
 }

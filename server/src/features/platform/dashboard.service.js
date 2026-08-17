@@ -10,6 +10,7 @@ async function getPlatformSummary() {
     activeAgencies,
     trialAgencies,
     suspendedAgencies,
+    pendingAgencies,
     totalProperties,
     totalLeads,
     hotLeads,
@@ -23,6 +24,11 @@ async function getPlatformSummary() {
     Agency.countDocuments({ subscriptionStatus: 'active' }),
     Agency.countDocuments({ subscriptionStatus: 'trialing' }),
     Agency.countDocuments({ status: 'suspended' }),
+    // Awaiting admin review (agencyRegistration feature) - surfaced
+    // separately from the subscriptionStatus-based counts above since a
+    // pending agency's subscriptionStatus is 'trialing' too and would
+    // otherwise be invisible inside that bucket.
+    Agency.countDocuments({ status: 'pending' }),
     Property.countDocuments({}),
     Inquiry.countDocuments({}),
     Inquiry.countDocuments({ status: 'hot' }),
@@ -54,6 +60,7 @@ async function getPlatformSummary() {
       activeAgencies,
       trialAgencies,
       suspendedAgencies,
+      pendingAgencies,
       totalProperties,
       totalLeads,
       hotLeads,

@@ -15,6 +15,44 @@
   --color-brand-800: #134e4a;
   --color-brand-900: #042f2e;
 
+  /* Semantic status scales - one source of truth for success/warning/
+     danger/info instead of every file picking its own emerald/green/
+     red/amber literal. Shades follow the same 50/100/300/500/600/700/900
+     rhythm the brand scale already uses. Consumed by the Badge/Alert/
+     Button primitives in components/ui/ - prefer those over reaching
+     for these tokens directly in page code. */
+  --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-300: #6ee7b7;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-success-900: #064e3b;
+
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-300: #fcd34d;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-900: #78350f;
+
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-300: #fca5a5;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+  --color-danger-900: #7f1d1d;
+
+  --color-info-50: #eff6ff;
+  --color-info-100: #dbeafe;
+  --color-info-300: #93c5fd;
+  --color-info-500: #3b82f6;
+  --color-info-600: #2563eb;
+  --color-info-700: #1d4ed8;
+  --color-info-900: #1e3a8a;
+
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-heading: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
 }
@@ -64,6 +102,209 @@ h1, h2, h3, h4 {
   .animate-shake,
   .animate-gradient-mesh {
     animation: none;
+  }
+}
+
+/* City-grid perspective floor (CityGridBackground.jsx) - a single
+   background-position animation on one element, nothing else moves, so
+   this stays cheap to run indefinitely. Day mode: saturated brand-600 on
+   white, kept deliberately un-faint. Night mode: a brighter brand-400
+   core line plus a blurred, lower-opacity duplicate underneath for a
+   glow, cheaper than an SVG/CSS filter glow re-evaluated every frame. */
+.city-grid-floor {
+  background-image:
+    repeating-linear-gradient(90deg, color-mix(in oklab, var(--color-brand-600) 70%, transparent) 0 2px, transparent 2px 110px),
+    repeating-linear-gradient(0deg, color-mix(in oklab, var(--color-brand-600) 70%, transparent) 0 2px, transparent 2px 110px);
+  background-size: 110px 110px;
+  /* A tight perspective() value paired with a steep rotateX is what
+     actually produces vanishing-point convergence (far lines compress
+     together, near lines fan out) - the previous 600px/72deg pairing
+     was too mild and read as a flat diagonal hatch instead of a floor
+     receding into the distance. transform-origin sits at the top edge
+     (the horizon line in CityGridBackground.jsx) so that's the point
+     lines converge toward. */
+  transform: perspective(280px) rotateX(83deg);
+  transform-origin: 50% 0%;
+  animation: city-grid-flow 5s linear infinite;
+}
+
+.dark .city-grid-floor {
+  background-image:
+    repeating-linear-gradient(90deg, color-mix(in oklab, var(--color-brand-400) 95%, transparent) 0 2px, transparent 2px 110px),
+    repeating-linear-gradient(0deg, color-mix(in oklab, var(--color-brand-400) 95%, transparent) 0 2px, transparent 2px 110px),
+    repeating-linear-gradient(90deg, color-mix(in oklab, var(--color-brand-400) 45%, transparent) 0 5px, transparent 5px 110px),
+    repeating-linear-gradient(0deg, color-mix(in oklab, var(--color-brand-400) 45%, transparent) 0 5px, transparent 5px 110px);
+  background-size: 110px 110px;
+  filter: blur(0.3px);
+}
+
+@keyframes city-grid-flow {
+  from { background-position-y: 0; }
+  to { background-position-y: 110px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .city-grid-floor {
+    animation: none;
+  }
+}
+
+/* Window/floor-line grid overlaid on each CityGridBackground.jsx
+   building facade - a flat solid-tinted rectangle reads as a bar chart,
+   this fine grid is what actually reads as "building". */
+.city-building-facade {
+  background-image:
+    repeating-linear-gradient(to bottom, transparent 0 6px, color-mix(in oklab, var(--color-brand-600) 55%, transparent) 6px 7px),
+    repeating-linear-gradient(to right, transparent 0 8px, color-mix(in oklab, var(--color-brand-600) 55%, transparent) 8px 9px);
+}
+
+.dark .city-building-facade {
+  background-image:
+    repeating-linear-gradient(to bottom, transparent 0 6px, color-mix(in oklab, var(--color-brand-300) 65%, transparent) 6px 7px),
+    repeating-linear-gradient(to right, transparent 0 8px, color-mix(in oklab, var(--color-brand-300) 65%, transparent) 8px 9px);
+}
+
+/* Homepage hero (HeroCityBackground.jsx) - a real photograph (the same
+   verified Unsplash city/water shot Home.jsx already used), color-graded
+   toward emerald green + warm gold via a `mix-blend-mode` duotone layer,
+   with a small number of broad soft aurora glows (screen-blended, so
+   they brighten naturally like real light instead of sitting on top as
+   flat colored shapes) and a subtle animated water-shimmer band at the
+   bottom. Every animated layer here only moves `opacity`/`background-
+   position`/`transform` - no layout, no per-frame JS. */
+.hero-city-photo {
+  background-image: url('https://images.unsplash.com/photo-1583417319070-4a69db38a482?auto=format&fit=crop&w=1600&q=70');
+  filter: brightness(0.9) contrast(1.08) saturate(1.2);
+}
+
+.dark .hero-city-photo {
+  filter: brightness(0.5) contrast(1.2) saturate(1.3);
+}
+
+/* `color` blend mode takes the HUE+SATURATION of this layer and keeps
+   the LUMINANCE of the photo underneath - unlike `overlay`/`screen`
+   (which only brighten/darken, they never actually change a pixel's
+   hue), this is what actually recolors a warm orange/amber night photo
+   toward green/gold while keeping its real lighting and detail. A
+   `transparent` middle stop leaves the photo's own color alone there,
+   so the recolor reads as two soft-edged washes from the sides rather
+   than a flat single-color film over the whole photo. */
+.hero-aurora-tint {
+  background: linear-gradient(
+    115deg,
+    rgba(0, 230, 118, 0.9) 0%,
+    rgba(57, 255, 20, 0.7) 20%,
+    transparent 46%,
+    transparent 56%,
+    rgba(255, 215, 0, 0.75) 80%,
+    rgba(255, 227, 131, 0.9) 100%
+  );
+  mix-blend-mode: color;
+  opacity: 0.75;
+}
+
+.dark .hero-aurora-tint {
+  opacity: 0.9;
+}
+
+.hero-aurora-glow {
+  background:
+    radial-gradient(ellipse 45% 65% at 22% 15%, rgba(57, 255, 20, 0.38), transparent 72%),
+    radial-gradient(ellipse 38% 58% at 76% 10%, rgba(255, 215, 0, 0.32), transparent 72%),
+    radial-gradient(ellipse 34% 52% at 50% 26%, rgba(0, 230, 118, 0.26), transparent 72%);
+  mix-blend-mode: screen;
+  opacity: 0.7;
+  animation: hero-aurora-drift 16s ease-in-out infinite alternate;
+}
+
+.dark .hero-aurora-glow {
+  opacity: 1;
+}
+
+@keyframes hero-aurora-drift {
+  0% { opacity: 0.75; transform: translateY(0) scale(1); }
+  100% { opacity: 1; transform: translateY(-2%) scale(1.04); }
+}
+
+/* A plain (non-repeating) linear-gradient tile with an explicit
+   background-size + the default background-repeat: repeat is the
+   correct way to make a seamlessly-tiling, animatable stripe pattern.
+   The previous version combined `repeating-linear-gradient` (which
+   already tiles on its own, at its own literal pixel stops) with an
+   unrelated percentage `background-size` on top of it and a
+   `mask-image` - that combination doesn't compose the way it looks like
+   it should, and rendered as a single hard-edged, wrong-colored band
+   instead of a soft moving shimmer. This is deliberately simpler: one
+   gradient tile, one clean repeat, animated by exactly one tile-width
+   per loop so it's seamless. */
+.hero-water-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.16) 44%,
+    rgba(57, 255, 20, 0.18) 52%,
+    rgba(255, 255, 255, 0.12) 60%,
+    transparent 76%
+  );
+  background-size: 260px 100%;
+  background-repeat: repeat-x;
+  mix-blend-mode: soft-light;
+  animation: hero-water-flow 7s linear infinite;
+}
+
+@keyframes hero-water-flow {
+  from { background-position-x: 0; }
+  to { background-position-x: -260px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-aurora-glow,
+  .hero-water-shimmer {
+    animation: none;
+  }
+}
+
+/* RainDropsOverlay.jsx - confined to whatever container renders it (the
+   "Why Agencies Choose Us" card grid only, see Home.jsx). Drops are
+   always in the DOM (cheap - ~20 elements) but only animate while
+   .rain-drops-active is applied (IntersectionObserver-driven), so nothing
+   is computed off-screen; the wrapper's opacity transition is what makes
+   the appearance/disappearance gradual rather than an abrupt cut. */
+.rain-drops-layer {
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+
+.rain-drops-layer.rain-drops-active {
+  opacity: 1;
+}
+
+.rain-drop {
+  position: absolute;
+  top: -24px;
+  border-radius: 999px;
+  background: linear-gradient(to bottom, transparent, color-mix(in oklab, var(--color-brand-400) 70%, white) 45%, transparent);
+  animation-name: rain-drop-fall;
+  animation-timing-function: ease-in;
+  animation-iteration-count: infinite;
+  animation-play-state: paused;
+}
+
+.rain-drops-active .rain-drop {
+  animation-play-state: running;
+}
+
+@keyframes rain-drop-fall {
+  0% { transform: translateY(0); opacity: 0; }
+  12% { opacity: 0.55; }
+  80% { opacity: 0.3; }
+  100% { transform: translateY(150px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rain-drop {
+    animation: none;
+    display: none;
   }
 }
 

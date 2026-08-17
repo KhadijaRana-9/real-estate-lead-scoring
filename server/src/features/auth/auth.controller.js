@@ -26,7 +26,11 @@ async function signup(req, res, next) {
 
 async function login(req, res, next) {
   try {
-    const user = await authService.login({ ...req.body, agencyId: req.tenant._id });
+    // req.tenant can be null here (see auth.routes.js's login route,
+    // which opts out of the DEFAULT_AGENCY_SLUG fallback) - authService.login
+    // treats a null agencyId as "no explicit workspace given, resolve by
+    // identity instead".
+    const user = await authService.login({ ...req.body, agencyId: req.tenant?._id ?? null });
     const accessToken = authService.signAccessToken(user);
     const refreshToken = await authService.issueRefreshToken(user._id, user.agencyId);
     res.json({ accessToken, refreshToken, user: toPublicUser(user) });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -18,8 +18,12 @@ import MediaGallery from '../components/propertyDetail/MediaGallery'
 import MortgageCalculator from '../components/propertyDetail/MortgageCalculator'
 import NearbyPlaces from '../components/propertyDetail/NearbyPlaces'
 import PriceTrendChart from '../components/propertyDetail/PriceTrendChart'
+import PropertyReviews, { RatingBadge } from '../components/propertyDetail/PropertyReviews'
 import useWishlist from '../hooks/useWishlist'
 import useCompareList from '../hooks/useCompareList'
+import ScrollReveal from '../components/ScrollReveal'
+import Input from '../components/ui/Input'
+import Button from '../components/ui/Button'
 import { formatPKR, formatDate } from '../utils/format'
 import { fadeUp } from '../motion/variants'
 
@@ -39,6 +43,7 @@ const TABS = [
   { key: 'location', label: 'Location & Nearby' },
   { key: 'finance', label: 'Home Finance' },
   { key: 'price', label: 'Price Index' },
+  { key: 'reviews', label: 'Reviews' },
 ]
 
 function SpecItem({ icon: Icon, label, value }) {
@@ -152,24 +157,26 @@ function AgentAgencyCard({ property }) {
   )
 }
 
-function RelatedSection({ title, properties }) {
+function RelatedSection({ title, properties, workspace }) {
   if (!properties || properties.length === 0) return null
   return (
-    <section>
+    <ScrollReveal as="section">
       <h2 className="mb-3 text-lg font-bold">{title}</h2>
       <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-2">
         {properties.map((p, i) => (
           <div key={p._id} className="w-64 shrink-0">
-            <PropertyCard property={p} index={i} />
+            <PropertyCard property={p} index={i} workspace={workspace} />
           </div>
         ))}
       </div>
-    </section>
+    </ScrollReveal>
   )
 }
 
 export default function PropertyDetail() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
+  const urlWorkspace = searchParams.get('workspace')
   const [property, setProperty] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -197,11 +204,11 @@ export default function PropertyDetail() {
     setSameAgency(null)
     setActiveTab('overview')
     api
-      .getProperty(id)
+      .getProperty(id, urlWorkspace)
       .then(({ data }) => {
         if (cancelled) return
         setProperty(data)
-        api.getRecommendedProperties(id).then(({ data: rec }) => !cancelled && setSimilar(rec)).catch(() => {})
+        api.getRecommendedProperties(id, data.agency?.slug).then(({ data: rec }) => !cancelled && setSimilar(rec)).catch(() => {})
         if (data.agent?._id) {
           api
             .getProperties({ workspace: data.agency?.slug, agent: data.agent._id, excludeId: id, limit: 6 })
@@ -222,11 +229,11 @@ export default function PropertyDetail() {
     return () => {
       cancelled = true
     }
-  }, [id])
+  }, [id, urlWorkspace])
 
   const onSubmit = async (formValues) => {
     try {
-      const { data } = await api.createInquiry({ propertyId: id, ...formValues, budget: Number(formValues.budget) })
+      const { data } = await api.createInquiry({ propertyId: id, ...formValues, budget: Number(formValues.budget) }, property.agency?.slug)
       toast.success('Inquiry sent! The agent will get back to you soon.')
       reset()
       setSubmitted({ score: data.score, status: data.status })
@@ -294,9 +301,12 @@ export default function PropertyDetail() {
                   {property.negotiable && <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">Negotiable</span>}
                 </div>
                 <h1 className="mt-2 text-2xl font-bold sm:text-3xl">{property.title}</h1>
-                <p className="mt-1 flex items-center gap-1 text-gray-500 dark:text-gray-400">
-                  <FiMapPin /> {property.locality ? `${property.locality}, ` : ''}{property.city}
-                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-3">
+                  <p className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                    <FiMapPin /> {property.locality ? `${property.locality}, ` : ''}{property.city}
+                  </p>
+                  <RatingBadge average={property.rating?.average} count={property.rating?.count} />
+                </div>
               </div>
               <div className="flex gap-2 print:hidden">
                 <button onClick={toggleWishlist} title={isSaved ? 'Remove from wishlist' : 'Save to wishlist'} className={`rounded-lg border p-2.5 ${isSaved ? 'border-red-300 bg-red-50 text-red-500 dark:border-red-800 dark:bg-red-950' : 'border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900'}`}>
@@ -349,7 +359,7 @@ export default function PropertyDetail() {
           {activeTab === 'overview' && (
             <>
               {/* Specifications */}
-              <section>
+              <ScrollReveal as="section">
                 <h2 className="mb-3 text-lg font-bold">Property Overview</h2>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   <SpecItem icon={FiLayers} label="Floors" value={property.floors || undefined} />
@@ -359,11 +369,11 @@ export default function PropertyDetail() {
                   <SpecItem icon={FiCompass} label="Locality" value={property.locality || undefined} />
                   <SpecItem icon={FiDollarSign} label="Maintenance" value={property.maintenanceCharges ? formatPKR(property.maintenanceCharges) + '/mo' : undefined} />
                 </div>
-              </section>
+              </ScrollReveal>
 
               {/* Amenities - real data only, whatever the agent actually entered */}
               {property.amenities?.length > 0 && (
-                <section>
+                <ScrollReveal as="section">
                   <h2 className="mb-3 text-lg font-bold">Amenities &amp; Features</h2>
                   <div className="flex flex-wrap gap-2">
                     {property.amenities.map((a) => (
@@ -372,36 +382,38 @@ export default function PropertyDetail() {
                       </span>
                     ))}
                   </div>
-                </section>
+                </ScrollReveal>
               )}
 
               {/* Documents / Floor Plans */}
               {property.documents?.length > 0 && (
-                <section>
+                <ScrollReveal as="section">
                   <h2 className="mb-3 text-lg font-bold">Documents &amp; Floor Plans</h2>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {property.documents.map((doc, i) => (
-                      <a key={i} href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-gray-200 p-3 hover:border-brand-400 dark:border-gray-800">
+                      <a key={i} href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-gray-200 p-3 transition-colors hover:border-brand-400 hover:shadow-sm dark:border-gray-800">
                         <FiFileText className="shrink-0 text-brand-500" size={18} />
                         <span className="flex-1 truncate text-sm">{doc.name}</span>
                         <FiDownload className="shrink-0 text-gray-400" size={14} />
                       </a>
                     ))}
                   </div>
-                </section>
+                </ScrollReveal>
               )}
 
               {/* Virtual Tour */}
               {property.virtualTourUrl && (
-                <section>
+                <ScrollReveal as="section">
                   <h2 className="mb-3 text-lg font-bold">Virtual Tour</h2>
                   <a href={property.virtualTourUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center rounded-2xl border border-dashed border-brand-300 bg-brand-50 py-10 text-sm font-medium text-brand-700 hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-950/40 dark:text-brand-300">
                     Open 360° Virtual Tour
                   </a>
-                </section>
+                </ScrollReveal>
               )}
 
-              <AiPriceInsight property={property} />
+              <ScrollReveal>
+                <AiPriceInsight property={property} />
+              </ScrollReveal>
             </>
           )}
 
@@ -413,9 +425,11 @@ export default function PropertyDetail() {
 
           {activeTab === 'price' && <PriceTrendChart city={property.city} />}
 
-          <RelatedSection title="Similar Properties" properties={similar} />
-          <RelatedSection title="More From This Agent" properties={sameAgent} />
-          <RelatedSection title="More From This Agency" properties={sameAgency} />
+          {activeTab === 'reviews' && <PropertyReviews propertyId={id} />}
+
+          <RelatedSection title="Similar Properties" properties={similar} workspace={property.agency?.slug} />
+          <RelatedSection title="More From This Agent" properties={sameAgent} workspace={property.agency?.slug} />
+          <RelatedSection title="More From This Agency" properties={sameAgency} workspace={property.agency?.slug} />
         </div>
 
         {/* Sidebar */}
@@ -441,35 +455,26 @@ export default function PropertyDetail() {
                 <>
                   <h2 className="mb-4 text-lg font-semibold">Interested in this property?</h2>
                   <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-                    <div>
-                      <input {...register('name', { required: 'Name is required' })} placeholder="Your name" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" />
-                      {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
-                    </div>
-                    <div>
-                      <input
-                        {...register('email', { required: 'Email is required', pattern: { value: /^\S+@\S+\.\S+$/, message: 'Enter a valid email' } })}
-                        placeholder="Your email"
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
-                      />
-                      {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>}
-                    </div>
-                    <input {...register('phone')} placeholder="Phone (optional)" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" />
-                    <div>
-                      <input
-                        type="number"
-                        {...register('budget', { required: 'Budget is required', min: { value: 1, message: 'Enter a valid budget' } })}
-                        placeholder="Your budget (PKR)"
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
-                      />
-                      {errors.budget && <p className="mt-1 text-xs text-red-500">{errors.budget.message}</p>}
-                    </div>
-                    <select {...register('moveTimeline')} defaultValue="exploring" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800">
+                    <Input placeholder="Your name" error={errors.name?.message} {...register('name', { required: 'Name is required' })} />
+                    <Input
+                      placeholder="Your email"
+                      error={errors.email?.message}
+                      {...register('email', { required: 'Email is required', pattern: { value: /^\S+@\S+\.\S+$/, message: 'Enter a valid email' } })}
+                    />
+                    <Input placeholder="Phone (optional)" {...register('phone')} />
+                    <Input
+                      type="number"
+                      placeholder="Your budget (PKR) *"
+                      error={errors.budget?.message}
+                      {...register('budget', { required: 'Budget is required', min: { value: 1, message: 'Enter a valid budget' } })}
+                    />
+                    <Input as="select" defaultValue="exploring" {...register('moveTimeline')}>
                       {TIMELINE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                    </select>
-                    <textarea {...register('message')} placeholder="Message (tell the agent what you're looking for)" rows={3} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" />
-                    <button type="submit" disabled={isSubmitting} className="w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">
+                    </Input>
+                    <Input as="textarea" placeholder="Message (tell the agent what you're looking for)" rows={3} {...register('message')} />
+                    <Button type="submit" loading={isSubmitting} className="w-full">
                       {isSubmitting ? 'Sending...' : 'Send Inquiry'}
-                    </button>
+                    </Button>
                   </form>
                 </>
               )}

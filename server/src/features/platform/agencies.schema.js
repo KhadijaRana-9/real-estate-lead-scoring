@@ -31,11 +31,17 @@ const listAgenciesQuerySchema = {
   query: z.object({
     page: z.coerce.number().int().positive().optional(),
     limit: z.coerce.number().int().positive().max(100).optional(),
+    status: z.enum(['pending', 'active', 'suspended', 'rejected']).optional(),
   }),
 };
 
 const agencyIdParamSchema = {
   params: z.object({ id: objectIdSchema }),
+};
+
+const rejectAgencySchema = {
+  params: agencyIdParamSchema.params,
+  body: z.object({ reason: z.string().trim().max(500).optional().default('') }),
 };
 
 const setVerifiedSchema = {
@@ -48,4 +54,4 @@ const setFeaturedSchema = {
   body: z.object({ featured: z.coerce.boolean() }),
 };
 
-module.exports = { createAgencySchema, listAgenciesQuerySchema, agencyIdParamSchema, setVerifiedSchema, setFeaturedSchema };
+module.exports = { createAgencySchema, listAgenciesQuerySchema, agencyIdParamSchema, setVerifiedSchema, setFeaturedSchema, rejectAgencySchema };

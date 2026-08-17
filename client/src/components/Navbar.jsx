@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { FiHome, FiSun, FiMoon, FiMenu, FiX } from 'react-icons/fi'
 import { useAuth } from '../context/AuthContext'
+import * as api from '../api/endpoints'
 
 function useDarkMode() {
   const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark')
@@ -38,18 +39,70 @@ export default function Navbar() {
 
   const isAgentOrAdmin = user && (user.role === 'agent' || user.role === 'agency_admin')
 
+  // When the visitor is currently on a specific agency's own page (its
+  // public profile or apply page - never the /agencies/compare route,
+  // which isn't a slug), Agent Login carries that workspace explicitly
+  // rather than relying on the login form's identity-based fallback -
+  // "don't use the platform default agency as a silent fallback when the
+  // agent's workspace is known" (see resolveTenant.js's allowDefaultFallback
+  // and auth.service.js's login(), fixed separately). Off an agency page,
+  // there's no specific workspace to know, so this links to plain /login,
+  // which already resolves a correct password by identity instead of ever
+  // guessing a default agency - the fix that makes this safe.
+  const agencySlugMatch = location.pathname.match(/^\/agencies\/([^/]+)/)
+  const currentAgencySlug = agencySlugMatch && agencySlugMatch[1] !== 'compare' ? agencySlugMatch[1] : null
+  const agentLoginTo = currentAgencySlug ? `/login?workspace=${currentAgencySlug}` : '/login'
+  // Agents enter through a specific agency's own public page, not the main
+  // DreamHomes platform - so the label (not just the href) reflects which
+  // one is being offered here.
+  const loginLinkLabel = currentAgencySlug ? 'Agent Login' : 'Agency Login'
+
+  // Branding follows whichever agency context is active: a logged-in
+  // agent/agency_admin always sees THEIR OWN agency's name+logo, anywhere
+  // in the app (dashboard included) - never the generic platform brand,
+  // and never another agency's, even while browsing a public /agencies/:slug
+  // page (e.g. via "View as Customer"). An anonymous/customer visitor on a
+  // specific agency's public page sees that agency's branding. Everyone
+  // else (anonymous on platform pages, super_admin) sees the platform
+  // "DreamHomes" brand. Cleared immediately on any context change, not
+  // just on fetch resolution, so the header never shows a stale agency.
+  const [agencyBrand, setAgencyBrand] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    setAgencyBrand(null)
+    if (isAgentOrAdmin) {
+      api
+        .getDashboardSummary()
+        .then(({ data }) => !cancelled && setAgencyBrand({ companyName: data.agencyName, logo: data.agencyLogo }))
+        .catch(() => {})
+    } else if (currentAgencySlug) {
+      api
+        .getAgencyProfile(currentAgencySlug)
+        .then(({ data }) => !cancelled && setAgencyBrand({ companyName: data.companyName, logo: data.logo }))
+        .catch(() => {})
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [isAgentOrAdmin, currentAgencySlug])
+
+  // The private agency workspace deliberately excludes a link back to the
+  // public /agencies directory - that's platform-marketing navigation for
+  // unauthenticated visitors, not part of an authenticated agent/admin's
+  // own workspace.
   const navLinks = isAgentOrAdmin
     ? [
         { to: '/dashboard', label: 'Dashboard' },
         { to: '/dashboard?tab=My%20Listings', label: 'Listings' },
         { to: '/dashboard?tab=Leads', label: 'Leads' },
-        { to: '/agencies', label: 'Agencies' },
       ]
-    : [
-        { to: '/listings', label: 'Buy' },
-        { to: '/agencies', label: 'Agencies' },
-        { to: '/about', label: 'About' },
-      ]
+    : user?.role === 'super_admin'
+      ? [{ to: '/platform', label: 'Platform Console' }]
+      : [
+          { to: '/pricing', label: 'Pricing' },
+          { to: '/agencies', label: 'Agencies' },
+          { to: '/about', label: 'About' },
+        ]
 
   // Exact match on pathname AND the query params the link cares about -
   // string-prefix/pathname-only matching is what let '/dashboard',
@@ -80,14 +133,21 @@ export default function Navbar() {
       }`}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        <Link to="/" className="flex items-center gap-2 text-xl font-bold text-brand-600 dark:text-brand-400">
-          <motion.span
-            animate={{ y: [0, -3, 0] }}
-            transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
-          >
-            <FiHome />
-          </motion.span>
-          DreamHomes
+        <Link
+          to={currentAgencySlug ? `/agencies/${currentAgencySlug}` : isAgentOrAdmin ? '/dashboard' : '/'}
+          className="flex items-center gap-2 text-xl font-bold text-brand-600 dark:text-brand-400"
+        >
+          {agencyBrand?.logo ? (
+            <img src={agencyBrand.logo} alt={agencyBrand.companyName} className="h-7 w-7 rounded object-cover" />
+          ) : (
+            <motion.span
+              animate={{ y: [0, -3, 0] }}
+              transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              <FiHome />
+            </motion.span>
+          )}
+          {agencyBrand?.companyName || 'DreamHomes'}
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
@@ -128,16 +188,16 @@ export default function Navbar() {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Link to="/login" className="rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800">
-                Login
+              <Link to={agentLoginTo} className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">
+                {loginLinkLabel}
               </Link>
-              <Link to="/signup">
+              <Link to="/pricing">
                 <motion.span
                   whileHover={{ scale: 1.04 }}
                   whileTap={{ scale: 0.96 }}
                   className="inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm shadow-brand-600/30 hover:bg-brand-700 hover:shadow-md hover:shadow-brand-600/40"
                 >
-                  Sign Up
+                  Get Started
                 </motion.span>
               </Link>
             </div>
@@ -169,8 +229,8 @@ export default function Navbar() {
               <button className="text-left" onClick={handleLogout}>Logout</button>
             ) : (
               <>
-                <Link to="/login" onClick={() => setMenuOpen(false)}>Login</Link>
-                <Link to="/signup" onClick={() => setMenuOpen(false)}>Sign Up</Link>
+                <Link to={agentLoginTo} onClick={() => setMenuOpen(false)} className="text-gray-600 dark:text-gray-300">{loginLinkLabel}</Link>
+                <Link to="/pricing" onClick={() => setMenuOpen(false)}>Get Started</Link>
               </>
             )}
           </div>

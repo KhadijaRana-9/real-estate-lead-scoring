@@ -1,7 +1,27 @@
 const mongoose = require('mongoose');
 
-const SUBSCRIPTION_PLANS = ['starter', 'professional', 'enterprise'];
+// 'trial' is a real plan (Free Trial), not just a status - see
+// billing.constants.js's PLANS.trial (unlimited properties/agents,
+// price 0) and agencyRegistration.service.js (7-day trialEndsAt, no
+// Stripe checkout at all). subscriptionStatus 'trialing' is shared by
+// both this AND any paid tier's initial pre-payment state - trialEndsAt
+// being set is what distinguishes an actual Free Trial from a paid
+// signup still waiting on its first Stripe checkout.
+const SUBSCRIPTION_PLANS = ['trial', 'starter', 'professional', 'enterprise'];
 const SUBSCRIPTION_STATUSES = ['trialing', 'active', 'past_due', 'canceled'];
+const BILLING_CYCLES = ['monthly', 'yearly'];
+const AGENCY_STATUSES = ['pending', 'active', 'suspended', 'rejected'];
+const PAYMENT_STATUSES = ['unpaid', 'paid', 'not_required'];
+
+const verificationDocumentSchema = new mongoose.Schema(
+  {
+    docType: { type: String, enum: ['registration_certificate', 'business_license', 'cnic', 'office_proof'], required: true },
+    name: { type: String, trim: true, required: true },
+    url: { type: String, required: true },
+    type: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
 
 const officeLocationSchema = new mongoose.Schema(
   {
@@ -102,11 +122,30 @@ const agencySchema = new mongoose.Schema(
     // Subscription shape only - no payment gateway wired yet (Feature 6)
     subscriptionPlan: { type: String, enum: SUBSCRIPTION_PLANS, default: 'starter' },
     subscriptionStatus: { type: String, enum: SUBSCRIPTION_STATUSES, default: 'trialing' },
+    billingCycle: { type: String, enum: BILLING_CYCLES, default: 'monthly' },
     trialEndsAt: { type: Date, default: null },
 
     // Platform lifecycle - lets Super Admin suspend an agency without
-    // deleting its data (Feature 5).
-    status: { type: String, enum: ['active', 'suspended'], default: 'active' },
+    // deleting its data (Feature 5). Self-registered agencies now start
+    // 'pending' (see agencyRegistration feature) instead of 'active';
+    // every pre-existing caller that creates an agency directly
+    // (platform/agencies.service.js's createAgency, test factories) still
+    // defaults to 'active' since they're explicit admin actions, not
+    // self-service signups awaiting review.
+    status: { type: String, enum: AGENCY_STATUSES, default: 'active' },
+
+    // Self-registration only - set once at registration, read by
+    // auth.service.js's login() to gate access before an admin approves,
+    // and by the Stripe webhook (billing.service.js) once payment
+    // actually completes. 'not_required' covers agencies created
+    // directly by a super_admin (CreateAgencyModal), which were never
+    // meant to go through checkout at all.
+    paymentStatus: { type: String, enum: PAYMENT_STATUSES, default: 'not_required' },
+    verificationDocuments: { type: [verificationDocumentSchema], default: [] },
+    approvedAt: { type: Date, default: null },
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    rejectedAt: { type: Date, default: null },
+    rejectionReason: { type: String, trim: true, default: '' },
   },
   { timestamps: true }
 );
@@ -128,3 +167,7 @@ agencySchema.index({ companyName: 'text', city: 'text' });
 
 module.exports = mongoose.model('Agency', agencySchema);
 module.exports.DAYS = DAYS;
+module.exports.AGENCY_STATUSES = AGENCY_STATUSES;
+module.exports.PAYMENT_STATUSES = PAYMENT_STATUSES;
+module.exports.SUBSCRIPTION_PLANS = SUBSCRIPTION_PLANS;
+module.exports.BILLING_CYCLES = BILLING_CYCLES;

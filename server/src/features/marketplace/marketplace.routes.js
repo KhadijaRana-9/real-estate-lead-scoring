@@ -44,8 +44,8 @@ router.post('/reviews/:reviewId/helpful', auth, validate(reviewIdParamSchema), c
 router.post(
   '/reviews/:reviewId/reply',
   auth,
-  resolveTenant(),
   requireRole('agency_admin'),
+  resolveTenant(),
   validate(replyToReviewSchema),
   controller.replyToReview
 );

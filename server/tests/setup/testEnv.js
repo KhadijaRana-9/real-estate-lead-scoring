@@ -15,3 +15,14 @@ process.env.CLIENT_ORIGIN = 'http://localhost:5173';
 // against real, deliberate input rather than an implicit fallback.
 delete process.env.DEFAULT_AGENCY_SLUG;
 delete process.env.PLATFORM_ROOT_DOMAIN;
+
+// Deliberately NOT set either: LLM_BASE_URL/LLM_API_KEY/LLM_MODEL (Phase
+// 3, features/ai/llm/). Test determinism must never depend on whatever a
+// developer's shell happens to have exported - explicitly cleared so the
+// AI test suite always exercises the deterministic-only path unless a
+// specific test opts into LLM escalation itself (see
+// aiLlmEscalation.test.js, which sets these for the duration of that
+// file only).
+delete process.env.LLM_BASE_URL;
+delete process.env.LLM_API_KEY;
+delete process.env.LLM_MODEL;

@@ -1,4 +1,6 @@
 const propertyService = require('./property.service');
+const favoriteService = require('../favorite/favorite.service');
+const propertyReviewService = require('../propertyReview/propertyReview.service');
 
 async function list(req, res, next) {
   try {
@@ -13,6 +15,69 @@ async function listMine(req, res, next) {
   try {
     const properties = await propertyService.listMyProperties(req.tenant._id, req.user);
     res.json(properties);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function listFavorites(req, res, next) {
+  try {
+    const properties = await favoriteService.listFavoriteProperties(req.tenant._id, req.user.id, { limit: Number(req.query.limit) || 20, crossTenant: true });
+    res.json({ properties });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function addFavorite(req, res, next) {
+  try {
+    const result = await favoriteService.addFavorite(req.tenant._id, req.user.id, req.params.id);
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function removeFavorite(req, res, next) {
+  try {
+    const result = await favoriteService.removeFavorite(req.tenant._id, req.user.id, req.params.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function listReviews(req, res, next) {
+  try {
+    const result = await propertyReviewService.listReviews(req.tenant._id, req.params.id, req.query);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function submitReview(req, res, next) {
+  try {
+    const review = await propertyReviewService.upsertReview(req.tenant._id, req.params.id, req.user, req.body);
+    res.status(201).json(review);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function deleteReview(req, res, next) {
+  try {
+    await propertyReviewService.deleteReview(req.tenant._id, req.params.id, req.user);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function topRated(req, res, next) {
+  try {
+    const properties = await propertyReviewService.getTopRatedProperties(req.tenant._id, { limit: Number(req.query.limit) || 6 });
+    res.json({ properties });
   } catch (err) {
     next(err);
   }
@@ -195,6 +260,13 @@ async function setCoverImage(req, res, next) {
 module.exports = {
   list,
   listMine,
+  listFavorites,
+  addFavorite,
+  removeFavorite,
+  listReviews,
+  submitReview,
+  deleteReview,
+  topRated,
   getById,
   create,
   createDraft,

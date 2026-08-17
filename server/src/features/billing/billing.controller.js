@@ -33,6 +33,7 @@ async function upgrade(req, res, next) {
     const result = await billingService.requestUpgrade(req.tenant._id, req.body.plan, {
       successUrl: req.body.successUrl || `${origin}/dashboard?billing=success`,
       cancelUrl: req.body.cancelUrl || `${origin}/dashboard?billing=cancelled`,
+      billingCycle: req.body.billingCycle,
     });
     res.json(result);
   } catch (err) {

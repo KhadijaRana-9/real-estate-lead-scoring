@@ -6,7 +6,7 @@ const AuthContext = createContext(null)
 
 function readStoredUser() {
   try {
-    const raw = localStorage.getItem('user')
+    const raw = localStorage.getItem('user') || sessionStorage.getItem('user')
     return raw ? JSON.parse(raw) : null
   } catch {
     return null
@@ -16,26 +16,38 @@ function readStoredUser() {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(readStoredUser)
 
-  const persist = (accessToken, refreshToken, user) => {
-    setSession(accessToken, refreshToken)
-    localStorage.setItem('user', JSON.stringify(user))
+  const persist = (accessToken, refreshToken, user, remember = true) => {
+    setSession(accessToken, refreshToken, remember)
+    const store = remember ? localStorage : sessionStorage
+    const other = remember ? sessionStorage : localStorage
+    store.setItem('user', JSON.stringify(user))
+    other.removeItem('user')
     setUser(user)
   }
 
-  const login = useCallback(async (credentials) => {
-    const { data } = await api.login(credentials)
-    persist(data.accessToken, data.refreshToken, data.user)
+  // remember defaults to true (today's exact always-localStorage
+  // behavior) for every other entry point; only Login.jsx's "Remember
+  // me" checkbox ever passes false.
+  const login = useCallback(async (credentials, workspace, remember = true) => {
+    const { data } = await api.login(credentials, workspace)
+    persist(data.accessToken, data.refreshToken, data.user, remember)
     return data.user
   }, [])
 
-  const signup = useCallback(async (payload) => {
-    const { data } = await api.signup(payload)
+  const signup = useCallback(async (payload, workspace) => {
+    const { data } = await api.signup(payload, workspace)
     persist(data.accessToken, data.refreshToken, data.user)
     return data.user
   }, [])
 
   const platformLogin = useCallback(async (credentials) => {
     const { data } = await api.platformLogin(credentials)
+    persist(data.accessToken, data.refreshToken, data.user)
+    return data.user
+  }, [])
+
+  const acceptInvite = useCallback(async (payload) => {
+    const { data } = await api.acceptAgentInvite(payload)
     persist(data.accessToken, data.refreshToken, data.user)
     return data.user
   }, [])
@@ -52,7 +64,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, platformLogin, logout }}>
+    <AuthContext.Provider value={{ user, login, signup, platformLogin, acceptInvite, logout }}>
       {children}
     </AuthContext.Provider>
   )

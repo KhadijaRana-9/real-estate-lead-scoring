@@ -84,6 +84,25 @@ const idParamSchema = {
   params: z.object({ id: objectIdSchema }),
 };
 
+// Mirrors marketplace.schema.js's submitReviewSchema/listReviewsQuerySchema
+// exactly, scoped to a property id instead of an agency slug.
+const submitPropertyReviewSchema = {
+  params: idParamSchema.params,
+  body: z.object({
+    rating: z.coerce.number().int().min(1).max(5),
+    comment: z.string().trim().max(2000).optional(),
+  }),
+};
+
+const listPropertyReviewsQuerySchema = {
+  params: idParamSchema.params,
+  query: z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().max(50).optional(),
+    sort: z.enum(['newest', 'highest', 'lowest']).optional(),
+  }),
+};
+
 const listPropertiesQuerySchema = {
   query: z.object({
     city: z.string().trim().min(1).max(100).optional(),
@@ -102,12 +121,18 @@ const listPropertiesQuerySchema = {
   }),
 };
 
+// Upper bounds are generous real-world ceilings, not arbitrary - 50,000
+// marla (~2,800 kanal) comfortably covers the largest legitimate farmhouse
+// or commercial-plaza listing, and 50 bedrooms/bathrooms covers even a
+// very large estate, while rejecting clearly-absurd/abusive input (e.g.
+// area: 999999999) with a normal 400 instead of silently producing a
+// meaningless multi-trillion-rupee estimate.
 const estimatePriceSchema = {
   body: z.object({
     city: z.string().trim().optional(),
-    area: z.coerce.number().positive('Area must be greater than 0'),
-    bedrooms: z.coerce.number().int().nonnegative().optional(),
-    bathrooms: z.coerce.number().int().nonnegative().optional(),
+    area: z.coerce.number().positive('Area must be greater than 0').max(50000, 'Area must be 50,000 marla or less'),
+    bedrooms: z.coerce.number().int().nonnegative().max(50, 'Bedrooms must be 50 or fewer').optional(),
+    bathrooms: z.coerce.number().int().nonnegative().max(50, 'Bathrooms must be 50 or fewer').optional(),
   }),
 };
 
@@ -183,6 +208,8 @@ module.exports = {
   updatePropertySchema,
   idParamSchema,
   listPropertiesQuerySchema,
+  submitPropertyReviewSchema,
+  listPropertyReviewsQuerySchema,
   estimatePriceSchema,
   compareQuerySchema,
   addMediaImagesSchema,

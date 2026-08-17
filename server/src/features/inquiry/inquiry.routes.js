@@ -10,13 +10,13 @@ const { createInquirySchema, moveLeadStageSchema } = require('./inquiry.schema')
 const router = express.Router();
 
 router.post('/', inquiryLimiter, resolveTenant(), validate(createInquirySchema), controller.create);
-router.get('/', auth, resolveTenant(), requireRole('agent', 'agency_admin'), controller.list);
-router.get('/pipeline', auth, resolveTenant(), requireRole('agent', 'agency_admin'), controller.pipeline);
+router.get('/', auth, requireRole('agent', 'agency_admin'), resolveTenant(), controller.list);
+router.get('/pipeline', auth, requireRole('agent', 'agency_admin'), resolveTenant(), controller.pipeline);
 router.patch(
   '/:id/stage',
   auth,
-  resolveTenant(),
   requireRole('agent', 'agency_admin'),
+  resolveTenant(),
   validate(moveLeadStageSchema),
   controller.moveStage
 );

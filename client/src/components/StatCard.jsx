@@ -21,7 +21,7 @@ export default function StatCard({ label, value, sub, icon, onClick }) {
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
         {icon && <span className="text-lg text-brand-500 dark:text-brand-400">{icon}</span>}
       </div>
-      <p className="mt-1 text-2xl font-bold">
+      <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
         {isNumber ? <CountUpNumber end={value} duration={1.2} /> : value}
       </p>
       {sub && <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{sub}</p>}

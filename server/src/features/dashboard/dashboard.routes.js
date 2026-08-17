@@ -6,7 +6,7 @@ const resolveTenant = require('../../shared/middleware/resolveTenant');
 
 const router = express.Router();
 
-router.get('/summary', auth, resolveTenant(), requireRole('agent', 'agency_admin'), controller.summary);
+router.get('/summary', auth, requireRole('agent', 'agency_admin'), resolveTenant(), controller.summary);
 router.get('/public-stats', resolveTenant(), controller.publicStats);
 
 module.exports = router;

@@ -1,6 +1,8 @@
 const propertyRepository = require('./property.repository');
 const Agency = require('../agency/agency.model');
 const Project = require('../project/project.model');
+const billingService = require('../billing/billing.service');
+const propertyReviewService = require('../propertyReview/propertyReview.service');
 const { estimatePrice } = require('../../shared/utils/priceEstimate');
 const { pickAllowedFields } = require('../../shared/utils/whitelist');
 const { escapeRegExp } = require('../../shared/utils/regex');
@@ -94,7 +96,7 @@ async function listProperties(tenantId, query) {
   ]);
 
   return {
-    items,
+    items: await attachRatings(tenantId, items),
     pagination: {
       page: pageNum,
       limit: limitNum,
@@ -106,7 +108,8 @@ async function listProperties(tenantId, query) {
 
 async function listMyProperties(tenantId, requester) {
   const filter = requester.role === 'agency_admin' ? {} : { agent: requester.id };
-  return propertyRepository.find(tenantId, filter).sort({ createdAt: -1 });
+  const items = await propertyRepository.find(tenantId, filter).sort({ createdAt: -1 });
+  return attachRatings(tenantId, items);
 }
 
 function notFound() {
@@ -132,7 +135,19 @@ function assertOwnership(property, requester, message) {
 // "Listing Agency" card actually needs.
 async function attachAgencySummary(tenantId, property) {
   const agency = await Agency.findById(tenantId).select('companyName slug logo phone whatsapp contactEmail verified subscriptionPlan city');
-  return { ...property.toObject(), agency };
+  const rating = await propertyReviewService.getRatingSummary(tenantId, property._id);
+  return { ...property.toObject(), agency, rating };
+}
+
+// List-view counterpart to attachAgencySummary above - one real batched
+// aggregation (getRatingSummaryForMany) instead of one query per card, so
+// every property card (search results, favorites, an agent's own
+// listings, AI search results) can show a real average/count instead of
+// only the single-property detail page having one.
+async function attachRatings(tenantId, properties) {
+  if (!properties.length) return properties;
+  const ratings = await propertyReviewService.getRatingSummaryForMany(tenantId, properties.map((p) => p._id));
+  return properties.map((p) => ({ ...(p.toObject ? p.toObject() : p), rating: ratings[p._id.toString()] }));
 }
 
 async function getPropertyById(tenantId, id) {
@@ -148,6 +163,7 @@ async function getPropertyById(tenantId, id) {
 }
 
 async function createProperty(tenantId, data, requester) {
+  await billingService.assertWithinLimit(tenantId, 'properties');
   const safeData = pickAllowedFields(data, EDITABLE_PROPERTY_FIELDS);
   const property = await propertyRepository.create(tenantId, { ...safeData, agent: requester.id });
   auditLog.record({ tenantId, actor: requester, action: 'property.create', targetType: 'Property', targetId: property._id, metadata: { title: property.title } });
@@ -157,8 +173,12 @@ async function createProperty(tenantId, data, requester) {
 // Wizard entry point: creates a minimal draft (only whatever Step 1 has
 // collected so far - typically just a title). Everything else defaults
 // per the relaxed schema fields; subsequent wizard steps fill it in via
-// the ordinary updateProperty below.
+// the ordinary updateProperty below. Counts against the plan's property
+// limit the same as a published listing (billing.service.js's
+// computeUsage counts every Property document regardless of status), so
+// the check runs here too rather than only at publish time.
 async function createDraftProperty(tenantId, data, requester) {
+  await billingService.assertWithinLimit(tenantId, 'properties');
   const safeData = pickAllowedFields(data, EDITABLE_PROPERTY_FIELDS);
   const property = await propertyRepository.create(tenantId, { ...safeData, agent: requester.id, status: 'draft' });
   auditLog.record({ tenantId, actor: requester, action: 'property.create_draft', targetType: 'Property', targetId: property._id, metadata: { title: property.title } });
@@ -414,30 +434,44 @@ async function recommendProperties(tenantId, propertyId, limit = 6) {
     type: reference.type,
   });
 
-  return candidates
+  const ranked = candidates
     .sort((a, b) => Math.abs(a.price - reference.price) - Math.abs(b.price - reference.price))
     .slice(0, limit);
+  // Real rating data attached (not a new match criterion - the
+  // city/type/price-closeness matching above is unchanged, deliberately
+  // avoiding an invented "similarity score") so a recommended property's
+  // real average/count is visible on its card and can be genuinely
+  // referenced when explaining a recommendation, same as every other
+  // property card.
+  return attachRatings(tenantId, ranked);
 }
 
 // Real, live-computed analytics slices - each backed by an actual sort
 // against status:'available' documents, nothing hardcoded.
 async function getAnalytics(tenantId) {
-  const [recentlyAdded, featured, mostViewed, highestPrice, lowestPrice, totalAvailable] = await Promise.all([
+  const [recentlyAdded, featured, mostViewed, highestPrice, lowestPrice, totalAvailable, topRated, mostReviewed] = await Promise.all([
     propertyRepository.find(tenantId, { status: 'available' }).sort({ createdAt: -1 }).limit(5),
     propertyRepository.find(tenantId, { status: 'available', featured: true }).sort({ createdAt: -1 }).limit(5),
     propertyRepository.find(tenantId, { status: 'available' }).sort({ views: -1 }).limit(5),
     propertyRepository.find(tenantId, { status: 'available' }).sort({ price: -1 }).limit(5),
     propertyRepository.find(tenantId, { status: 'available' }).sort({ price: 1 }).limit(5),
     propertyRepository.countDocuments(tenantId, { status: 'available' }),
+    // Real aggregation over PropertyReview - see propertyReview.service.js.
+    // A property needs >= MIN_REVIEW_SAMPLE_SIZE real reviews to appear in
+    // topRated (a single 5-star review isn't a meaningful "best" signal);
+    // mostReviewed has no floor since it's the count itself.
+    propertyReviewService.getTopRatedProperties(tenantId, { limit: 5 }),
+    propertyReviewService.getMostReviewedProperties(tenantId, { limit: 5 }),
   ]);
 
-  return { totalAvailable, recentlyAdded, featured, mostViewed, highestPrice, lowestPrice };
+  return { totalAvailable, recentlyAdded, featured, mostViewed, highestPrice, lowestPrice, topRated, mostReviewed };
 }
 
 module.exports = {
   listProperties,
   listMyProperties,
   getPropertyById,
+  attachRatings,
   createProperty,
   createDraftProperty,
   updateProperty,

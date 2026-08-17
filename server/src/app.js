@@ -8,11 +8,13 @@ const inquiryRoutes = require('./features/inquiry/inquiry.routes');
 const dashboardRoutes = require('./features/dashboard/dashboard.routes');
 const platformRoutes = require('./features/platform/platform.routes');
 const agencyRoutes = require('./features/agency/agency.routes');
+const agencyRegistrationRoutes = require('./features/agencyRegistration/agencyRegistration.routes');
 const marketplaceRoutes = require('./features/marketplace/marketplace.routes');
 const aiRoutes = require('./features/ai/ai.routes');
 const uploadsRoutes = require('./features/uploads/uploads.routes');
 const crmRoutes = require('./features/crm/crm.routes');
 const billingRoutes = require('./features/billing/billing.routes');
+const billingWebhookRoutes = require('./features/billing/billing.webhook.routes');
 const reportsRoutes = require('./features/reports/reports.routes');
 const auditRoutes = require('./features/audit/audit.routes');
 const developerRoutes = require('./features/developer/developer.routes');
@@ -36,6 +38,13 @@ function createApp(env) {
 
   const allowedOrigins = env.clientOrigin.split(',').map((origin) => origin.trim());
   app.use(cors({ origin: allowedOrigins }));
+
+  // Mounted BEFORE express.json() - Stripe webhook signature
+  // verification needs the untouched raw body (see billing.webhook.
+  // routes.js), which express.json() below would otherwise consume
+  // first for every request, this route included.
+  app.use('/api/billing/webhook', billingWebhookRoutes);
+
   app.use(express.json());
 
   app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
@@ -59,6 +68,7 @@ function createApp(env) {
   app.use('/api/billing', billingRoutes);
   app.use('/api/reports', reportsRoutes);
   app.use('/api/agency', agencyRoutes);
+  app.use('/api/agency-registrations', agencyRegistrationRoutes);
   app.use('/api/agencies', marketplaceRoutes);
   app.use('/api/audit', auditRoutes);
   app.use('/api/developers', developerRoutes);

@@ -1,6 +1,5 @@
 const express = require('express');
 const controller = require('./property.controller');
-const collectionsController = require('./collections.controller');
 const auth = require('../../shared/middleware/auth');
 const requireRole = require('../../shared/middleware/role');
 const validate = require('../../shared/middleware/validate');
@@ -11,6 +10,8 @@ const {
   updatePropertySchema,
   idParamSchema,
   listPropertiesQuerySchema,
+  submitPropertyReviewSchema,
+  listPropertyReviewsQuerySchema,
   estimatePriceSchema,
   compareQuerySchema,
   addMediaImagesSchema,
@@ -22,15 +23,6 @@ const {
 
 const router = express.Router();
 
-// Public, cross-tenant homepage collections - deliberately registered
-// before the tenant-scoped routes below and NOT behind resolveTenant()
-// (see collections.service.js for why: these discover listings across
-// every agency, same posture as the marketplace directory).
-router.get('/collections/luxury', collectionsController.luxury);
-router.get('/collections/commercial', collectionsController.commercial);
-router.get('/collections/investment', collectionsController.investment);
-router.get('/collections/new-launches', collectionsController.newLaunches);
-
 // Public browsing routes: no req.user yet, so resolveTenant resolves
 // from host/workspace/default instead.
 router.get('/', resolveTenant(), validate(listPropertiesQuerySchema), controller.list);
@@ -40,11 +32,18 @@ router.post('/estimate-price', validate(estimatePriceSchema), controller.estimat
 // Must stay registered before GET /:id - otherwise Express matches
 // "mine"/"compare"/"analytics" as :id first (this ordering constraint
 // predates this refactor, see property.routes.js history).
-router.get('/mine', auth, resolveTenant(), requireRole('agent', 'agency_admin'), controller.listMine);
+router.get('/mine', auth, requireRole('agent', 'agency_admin'), resolveTenant(), controller.listMine);
 router.get('/compare', resolveTenant(), validate(compareQuerySchema), controller.compare);
 router.get('/analytics', resolveTenant(), controller.analytics);
+router.get('/favorites/mine', auth, resolveTenant(), controller.listFavorites);
+router.get('/top-rated', resolveTenant(), controller.topRated);
 
 router.get('/:id', resolveTenant(), validate(idParamSchema), controller.getById);
+router.post('/:id/favorite', auth, resolveTenant(), validate(idParamSchema), controller.addFavorite);
+router.delete('/:id/favorite', auth, resolveTenant(), validate(idParamSchema), controller.removeFavorite);
+router.get('/:id/reviews', resolveTenant(), validate(listPropertyReviewsQuerySchema), controller.listReviews);
+router.post('/:id/reviews', auth, requireRole('customer'), resolveTenant(), validate(submitPropertyReviewSchema), controller.submitReview);
+router.delete('/:id/reviews', auth, requireRole('customer'), resolveTenant(), validate(idParamSchema), controller.deleteReview);
 router.get('/:id/recommendations', resolveTenant(), validate(idParamSchema), controller.recommendations);
 
 // Authenticated writes: auth runs first so resolveTenant can trust
@@ -52,8 +51,8 @@ router.get('/:id/recommendations', resolveTenant(), validate(idParamSchema), con
 router.post(
   '/',
   auth,
-  resolveTenant(),
   requireRole('agent', 'agency_admin'),
+  resolveTenant(),
   validate(createPropertySchema),
   controller.create
 );
@@ -64,8 +63,8 @@ router.post(
 router.post(
   '/drafts',
   auth,
-  resolveTenant(),
   requireRole('agent', 'agency_admin'),
+  resolveTenant(),
   validate(draftPropertySchema),
   controller.createDraft
 );
@@ -73,16 +72,16 @@ router.post(
 router.put(
   '/:id',
   auth,
-  resolveTenant(),
   requireRole('agent', 'agency_admin'),
+  resolveTenant(),
   validate(updatePropertySchema),
   controller.update
 );
 router.delete(
   '/:id',
   auth,
-  resolveTenant(),
   requireRole('agent', 'agency_admin'),
+  resolveTenant(),
   validate(idParamSchema),
   controller.remove
 );
@@ -92,8 +91,8 @@ router.delete(
 router.patch(
   '/:id/publish',
   auth,
-  resolveTenant(),
   requireRole('agent', 'agency_admin'),
+  resolveTenant(),
   validate(idParamSchema),
   controller.publish
 );
@@ -101,7 +100,7 @@ router.patch(
 // Categorized media management (wizard's Media Manager + property owner
 // edits) - see property.service.js's addMediaImages/addMediaVideos/etc.
 // and property.model.js's MEDIA_CATEGORIES for the 19 room categories.
-const mediaAuth = [auth, resolveTenant(), requireRole('agent', 'agency_admin')];
+const mediaAuth = [auth, requireRole('agent', 'agency_admin'), resolveTenant()];
 
 router.post('/:id/media/images', ...mediaAuth, validate(addMediaImagesSchema), controller.addMediaImages);
 router.post('/:id/media/videos', ...mediaAuth, validate(addMediaVideosSchema), controller.addMediaVideos);

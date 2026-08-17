@@ -10,6 +10,7 @@ const {
   conversationIdParamSchema,
   updateConversationSchema,
   propertyAssistSchema,
+  extractListingFieldsSchema,
 } = require('./ai.schema');
 
 const router = express.Router();
@@ -34,6 +35,17 @@ router.post(
   requireRole('agent', 'agency_admin'),
   validate(propertyAssistSchema),
   controller.propertyAssist
+);
+
+// Phase 3 (Listing AI) - same wizard-only role gate as /property-assist
+// above; this is the reverse direction (rough text -> structured fields
+// instead of fields -> generated text).
+router.post(
+  '/extract-listing-fields',
+  aiLimiter,
+  requireRole('agent', 'agency_admin'),
+  validate(extractListingFieldsSchema),
+  controller.extractListingFields
 );
 
 module.exports = router;

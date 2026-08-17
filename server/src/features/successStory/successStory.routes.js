@@ -9,14 +9,14 @@ const { createSuccessStorySchema, listSuccessStoriesQuerySchema, moderateSchema 
 const router = express.Router();
 
 router.get('/', validate(listSuccessStoriesQuerySchema), controller.list);
-router.get('/mine', auth, resolveTenant(), requireRole('agency_admin'), controller.mine);
+router.get('/mine', auth, requireRole('agency_admin'), resolveTenant(), controller.mine);
 router.get('/pending', auth, requireRole('super_admin'), controller.pendingModeration);
 
 router.post(
   '/',
   auth,
-  resolveTenant(),
   requireRole('agency_admin'),
+  resolveTenant(),
   validate(createSuccessStorySchema),
   controller.create
 );

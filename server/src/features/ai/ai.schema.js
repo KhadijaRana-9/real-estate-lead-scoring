@@ -47,9 +47,19 @@ const propertyAssistSchema = {
   }),
 };
 
+// Phase 3 (Listing AI) - free text only; the extraction logic itself
+// (propertyAssist.service.js's extractFields) decides what it can and
+// can't find, this schema just bounds the input size.
+const extractListingFieldsSchema = {
+  body: z.object({
+    text: z.string().trim().min(10, 'Please provide a bit more detail').max(2000, 'Text is too long'),
+  }),
+};
+
 module.exports = {
   chatMessageSchema,
   conversationIdParamSchema,
   updateConversationSchema,
   propertyAssistSchema,
+  extractListingFieldsSchema,
 };

@@ -77,6 +77,49 @@ describe('Cross-tenant isolation (formalizes the manual verification run earlier
   });
 });
 
+describe('DreamHomes default-tenant data never appears as another agency\'s private listings', () => {
+  it('an agency named/slugged like the real default tenant is still an ordinary, isolated tenant', async () => {
+    // Simulates the real seeded default tenant (server/.env's
+    // DEFAULT_AGENCY_SLUG=dreamhomes, server/src/seed/seed.js) inside
+    // the isolated test database, to prove Agency A's private "My
+    // Listings" view can never surface DreamHomes' own marketplace
+    // properties - not because DreamHomes is special-cased anywhere,
+    // but because it isn't: it's scoped by the exact same agencyId
+        // filter as any other agency.
+    const dreamhomes = await createAgency({ slug: 'dreamhomes', companyName: 'DreamHomes' });
+    const agencyA = await createAgency();
+    const dreamhomesAgent = await signupUser(app, dreamhomes.slug, { role: 'agent' });
+    const agentA = await signupUser(app, agencyA.slug, { role: 'agent' });
+
+    const dhProp = await request(app)
+      .post('/api/properties')
+      .set({ Authorization: `Bearer ${dreamhomesAgent.accessToken}` })
+      .send(propertyPayload);
+
+    const mineA = await request(app).get('/api/properties/mine').set({ Authorization: `Bearer ${agentA.accessToken}` });
+    expect(mineA.body.some((p) => p._id === dhProp.body._id)).toBe(false);
+  });
+});
+
+describe('Dashboard team stats (Overview cards) are agency_admin-only and tenant-scoped', () => {
+  it('agency_admin sees real counts scoped to their own agency; a plain agent sees null; counts never cross tenants', async () => {
+    const { createRoleUser } = require('../helpers/factories');
+    const agencyA = await createAgency();
+    const agencyB = await createAgency();
+    const adminA = await createRoleUser(agencyA._id, 'agency_admin');
+    const agentA = await createRoleUser(agencyA._id, 'agent');
+    await createRoleUser(agencyB._id, 'agent');
+    await createRoleUser(agencyB._id, 'agent');
+
+    const summaryAdminA = await request(app).get('/api/dashboard/summary').set({ Authorization: `Bearer ${adminA.accessToken}` });
+    expect(summaryAdminA.body.cards.team).not.toBeNull();
+    expect(summaryAdminA.body.cards.team.totalAgents).toBe(1);
+
+    const summaryAgentA = await request(app).get('/api/dashboard/summary').set({ Authorization: `Bearer ${agentA.accessToken}` });
+    expect(summaryAgentA.body.cards.team).toBeNull();
+  });
+});
+
 describe('Super Admin platform surface and RBAC', () => {
   const { createSuperAdmin } = require('../helpers/factories');
   let superAdmin, superAdminPassword, tenant, agent;

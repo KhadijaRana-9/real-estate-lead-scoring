@@ -17,7 +17,7 @@ const router = express.Router();
 
 // CRM is an internal working-pipeline tool for the people actually
 // running listings - not exposed to customers or super_admin.
-router.use(auth, resolveTenant(), requireRole('agent', 'agency_admin'));
+router.use(auth, requireRole('agent', 'agency_admin'), resolveTenant());
 
 router.get('/reminders', controller.reminders);
 

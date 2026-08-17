@@ -1,6 +1,13 @@
 const Conversation = require('./conversation.model');
 const { resolveMessage } = require('./localEngine');
 
+// How many raw transcript turns (Phase 3) get passed to the LLM
+// escalation path as replay context - the deterministic path ignores
+// this entirely. Small and fixed, not configurable yet - matches
+// memory.js's MAX_RECENT_TOOL_RESULTS in spirit (bounded, cheap to load
+// every turn).
+const RECENT_MESSAGES_FOR_LLM = 10;
+
 async function getOrCreateConversation(conversationId, requester, tenantId) {
   if (conversationId) {
     const existing = await Conversation.findOne({ _id: conversationId, user: requester.id });
@@ -25,8 +32,9 @@ async function persistTurn(conversation, message, replyText, attachments, memory
 async function sendMessage({ conversationId, message, requester, tenantId }) {
   const conversation = await getOrCreateConversation(conversationId, requester, tenantId);
   const ctx = { tenantId, requester };
+  const recentMessages = conversation.messages.slice(-RECENT_MESSAGES_FOR_LLM);
 
-  const { text, attachments, memory } = await resolveMessage(message, ctx, conversation.context);
+  const { text, attachments, memory } = await resolveMessage(message, ctx, conversation.context, recentMessages);
 
   await persistTurn(conversation, message, text, attachments, memory);
   return { conversationId: conversation._id, reply: text, attachments };
@@ -48,8 +56,9 @@ function delay(ms) {
 async function* streamMessage({ conversationId, message, requester, tenantId }) {
   const conversation = await getOrCreateConversation(conversationId, requester, tenantId);
   const ctx = { tenantId, requester };
+  const recentMessages = conversation.messages.slice(-RECENT_MESSAGES_FOR_LLM);
 
-  const { text, attachments, memory } = await resolveMessage(message, ctx, conversation.context);
+  const { text, attachments, memory } = await resolveMessage(message, ctx, conversation.context, recentMessages);
 
   if (attachments.length > 0) {
     yield { type: 'attachments', attachments, conversationId: conversation._id };

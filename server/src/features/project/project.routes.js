@@ -19,26 +19,26 @@ const router = express.Router();
 router.get('/', validate(listProjectsQuerySchema), controller.list);
 router.get('/featured', controller.featured);
 router.get('/new-launches', controller.newLaunches);
-router.get('/mine', auth, resolveTenant(), requireRole('agent', 'agency_admin'), controller.mine);
+router.get('/mine', auth, requireRole('agent', 'agency_admin'), resolveTenant(), controller.mine);
 router.get('/:slug', validate(slugParamSchema), controller.getBySlug);
 
 router.post(
   '/',
   auth,
-  resolveTenant(),
   requireRole('agency_admin'),
+  resolveTenant(),
   validate(createProjectSchema),
   controller.create
 );
 router.patch(
   '/:id',
   auth,
-  resolveTenant(),
   requireRole('agency_admin'),
+  resolveTenant(),
   validate(updateProjectSchema),
   controller.update
 );
-router.delete('/:id', auth, resolveTenant(), requireRole('agency_admin'), validate(idParamSchema), controller.remove);
+router.delete('/:id', auth, requireRole('agency_admin'), resolveTenant(), validate(idParamSchema), controller.remove);
 
 router.patch('/:id/featured', auth, requireRole('super_admin'), validate(setFeaturedSchema), controller.setFeatured);
 

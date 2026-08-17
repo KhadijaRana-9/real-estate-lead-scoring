@@ -15,6 +15,10 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, trim: true, default: '' },
     whatsapp: { type: String, trim: true, default: '' },
     avatar: { type: String, trim: true, default: '' },
+    // Set only for an agency's registering owner (see agencyRegistration
+    // feature) - part of the verification packet a super_admin reviews
+    // before approval, not collected for ordinary agent/customer signup.
+    cnic: { type: String, trim: true, default: '' },
     // Full invariant now enforced: null only for super_admin, set for
     // every other role. Safe now that resolveTenant + auth.service.js
     // populate agencyId on every signup.

@@ -64,6 +64,9 @@ const awardSchema = z.object({
 
 const updateProfileSchema = {
   body: z.object({
+    companyName: z.string().trim().min(2).max(200).optional(),
+    phone: z.string().trim().max(30).optional(),
+    contactEmail: z.string().trim().toLowerCase().email('Invalid email address').optional(),
     description: z.string().trim().max(3000).optional(),
     whatsapp: z.string().trim().max(30).optional(),
     website: z.string().trim().max(300).optional(),
@@ -95,4 +98,34 @@ const updateProfileSchema = {
   }),
 };
 
-module.exports = { inviteUserSchema, idParamSchema, acceptInviteSchema, updateBrandingSchema, updateProfileSchema };
+const applyToAgencySchema = {
+  body: z.object({
+    agencyId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid agency id'),
+    name: z.string().trim().min(2).max(100),
+    email: z.string().trim().toLowerCase().email('Invalid email address'),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    phone: z.string().trim().max(30).optional(),
+    experienceYears: z.coerce.number().int().min(0).max(80).optional(),
+    message: z.string().trim().max(1000).optional(),
+  }),
+};
+
+const rejectApplicationSchema = {
+  params: z.object({ id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id') }),
+  body: z.object({ reason: z.string().trim().max(500).optional() }),
+};
+
+const listApplicationsQuerySchema = {
+  query: z.object({ status: z.enum(['pending', 'approved', 'rejected']).optional() }),
+};
+
+module.exports = {
+  inviteUserSchema,
+  idParamSchema,
+  acceptInviteSchema,
+  updateBrandingSchema,
+  updateProfileSchema,
+  applyToAgencySchema,
+  rejectApplicationSchema,
+  listApplicationsQuerySchema,
+};

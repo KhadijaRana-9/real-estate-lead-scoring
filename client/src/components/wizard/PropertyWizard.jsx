@@ -169,7 +169,7 @@ export default function PropertyWizard({ property: existingProperty, onClose, on
   const isLastStep = step === STEP_COMPONENTS.length
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 sm:p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 sm:z-50 sm:p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.97, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}

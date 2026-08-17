@@ -12,10 +12,10 @@ const router = express.Router();
 // project directories.
 router.get('/', validate(listBlogsQuerySchema), controller.list);
 router.get('/latest', controller.latest);
-router.get('/mine', auth, resolveTenant(), requireRole('agent', 'agency_admin'), controller.mine);
+router.get('/mine', auth, requireRole('agent', 'agency_admin'), resolveTenant(), controller.mine);
 router.get('/:slug', validate(slugParamSchema), controller.getBySlug);
 
-const writeAuth = [auth, resolveTenant(), requireRole('agent', 'agency_admin')];
+const writeAuth = [auth, requireRole('agent', 'agency_admin'), resolveTenant()];
 
 router.post('/', ...writeAuth, validate(createBlogSchema), controller.create);
 router.patch('/:id', ...writeAuth, validate(updateBlogSchema), controller.update);

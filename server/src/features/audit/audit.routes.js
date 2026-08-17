@@ -6,7 +6,7 @@ const auditLog = require('./auditLog.service');
 
 const router = express.Router();
 
-router.get('/', auth, resolveTenant(), requireRole('agent', 'agency_admin'), async (req, res, next) => {
+router.get('/', auth, requireRole('agent', 'agency_admin'), resolveTenant(), async (req, res, next) => {
   try {
     const logs = await auditLog.list(req.tenant._id, req.user, req.query);
     res.json(logs);

@@ -9,6 +9,8 @@
 // spacing variant of "assalam o alaikum" / "assalamu alaikum" /
 // "as-salam alaikum" - stripping whitespace first turns all of those
 // into the same "assalamalaikum" comparison.
+const { getPersona } = require('../llm/personas');
+
 function normalize(text) {
   return text.trim().toLowerCase().replace(/[\s\-!.,]+/g, '');
 }
@@ -28,9 +30,11 @@ function matchSmallTalk(message, requester) {
   const name = firstName(requester?.name);
 
   if (GREETING_WORDS.includes(normalized) || GREETING_RE.test(normalized)) {
-    return name
-      ? `Hi ${name}! How can I help you today? Ask me about listings, leads, agencies, market prices, or your dashboard.`
-      : "Hello! How can I help you today? Ask me about listings, leads, agencies, market prices, or your dashboard.";
+    // Role-specific hint (llm/personas.js - same source the LLM path
+    // reads) instead of a one-size-fits-all list that used to mention
+    // "leads"/"your dashboard" to customers who can't access either.
+    const { greetingHint } = getPersona(requester?.role);
+    return name ? `Hi ${name}! How can I help you today? ${greetingHint}` : `Hello! How can I help you today? ${greetingHint}`;
   }
 
   if (THANKS_WORDS.includes(normalized)) {

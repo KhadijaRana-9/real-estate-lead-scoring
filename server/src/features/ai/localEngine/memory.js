@@ -7,12 +7,13 @@
 // dumps those into `context`, which is meant to stay small and cheap to
 // load on every turn).
 //
-// This is preparation for Phase 3 (LLM follow-ups like "why is it
-// performing well?"), not a new capability on its own: the deterministic
-// engine today never reads `entities`/`recentToolResults` back out to
-// change its own behavior. It only writes them. A future LLM-backed
-// engine is what will actually read them to answer a follow-up without
-// re-asking the user which property they meant.
+// Originally written purely for Phase 3's LLM path to consume (the
+// deterministic engine itself only wrote `entities`/`recentToolResults`,
+// never read them back). localEngine/index.js now reads
+// `entities.propertyId` back for one narrow, safe case: a pronoun
+// follow-up ("unfavorite it") to add/remove-favorite right after a
+// property was shown - see index.js for why this is scoped narrowly
+// instead of a general pronoun-resolution mechanism.
 
 const MAX_RECENT_TOOL_RESULTS = 5;
 
@@ -59,6 +60,11 @@ const SUMMARIZERS = {
     summary: `Recommended ${plural(r.count || 0, 'similar property')}.`,
     identifiers: ids(r.properties),
     entities: {},
+  }),
+  get_favorite_properties: (_args, r) => ({
+    summary: r.count ? `Showed ${plural(r.count, 'saved property')}.` : 'No saved properties yet.',
+    identifiers: ids(r.properties),
+    entities: r.count ? { propertyId: firstId(r.properties) } : {},
   }),
   explain_lead_score: (args, r) => ({
     summary: `Explained ${r.customer ? `${r.customer}'s` : 'a'} lead score (${r.score}/100).`,

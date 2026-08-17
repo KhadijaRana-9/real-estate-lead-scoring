@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion'
-import { FiMapPin, FiMaximize2, FiArrowRight } from 'react-icons/fi'
+import { FiMapPin, FiMaximize2, FiArrowRight, FiStar } from 'react-icons/fi'
 import { PiBathtub, PiBed } from 'react-icons/pi'
 import { formatPKR } from '../utils/format'
 
@@ -10,7 +10,7 @@ const FALLBACK_IMAGE =
 
 const TILT_RANGE = 6 // degrees, kept small so it reads as "premium", not gimmicky
 
-export default function PropertyCard({ property, index = 0 }) {
+export default function PropertyCard({ property, index = 0, workspace }) {
   const cardRef = useRef(null)
   const mouseX = useMotionValue(0.5)
   const mouseY = useMotionValue(0.5)
@@ -49,7 +49,12 @@ export default function PropertyCard({ property, index = 0 }) {
       {/* Gradient border glow on hover - a hairline ring, not a full outline */}
       <div className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 ring-1 ring-brand-400/40 transition-opacity duration-300 group-hover:opacity-100" />
 
-      <Link to={`/properties/${property._id}`}>
+      {/* Anonymous/cross-tenant visitors have no JWT-derived tenant, so
+          the detail page must carry the workspace forward explicitly -
+          without it, resolveTenant() falls back to the default agency
+          and a non-default agency's property 404s ("Property not
+          found") even though it's right there in this list. */}
+      <Link to={workspace ? `/properties/${property._id}?workspace=${workspace}` : `/properties/${property._id}`}>
         <div className="relative h-48 w-full overflow-hidden">
           <img
             src={image}
@@ -82,9 +87,19 @@ export default function PropertyCard({ property, index = 0 }) {
           <h3 className="truncate text-lg font-semibold text-gray-900 dark:text-gray-50">
             {property.title}
           </h3>
-          <p className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
-            <FiMapPin /> {property.locality ? `${property.locality}, ` : ''}{property.city}
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="flex min-w-0 items-center gap-1 truncate text-sm text-gray-500 dark:text-gray-400">
+              <FiMapPin className="shrink-0" /> {property.locality ? `${property.locality}, ` : ''}{property.city}
+            </p>
+            {/* Real average/count only - no rating badge at all for a
+                property with zero reviews yet, rather than a fake "0.0". */}
+            {property.rating?.count > 0 && (
+              <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-amber-500">
+                <FiStar className="fill-amber-400" size={12} /> {property.rating.average}
+                <span className="font-normal text-gray-400">({property.rating.count})</span>
+              </span>
+            )}
+          </div>
 
           <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
             <span className="flex items-center gap-1">

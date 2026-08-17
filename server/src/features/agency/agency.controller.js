@@ -90,4 +90,83 @@ async function acceptInvite(req, res, next) {
   }
 }
 
-module.exports = { getPerformance, getBranding, getProfile, updateBranding, updateProfile, inviteUser, listInvites, revokeInvite, acceptInvite };
+// Public: no session yet, the applicant is choosing which agency to
+// apply to. Never issues a login session (unlike acceptInvite) - the
+// applicant only gets an account once an agency_admin approves.
+async function applyToAgency(req, res, next) {
+  try {
+    const application = await agencyService.applyToAgency(req.body);
+    res.status(201).json({ id: application._id, status: application.status });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function listApplications(req, res, next) {
+  try {
+    const applications = await agencyService.listApplications(req.tenant._id, req.query.status);
+    res.json(applications);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function approveApplication(req, res, next) {
+  try {
+    const user = await agencyService.approveApplication(req.tenant._id, req.params.id, req.user);
+    res.json({ id: user._id, name: user.name, email: user.email, role: user.role });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function rejectApplication(req, res, next) {
+  try {
+    const application = await agencyService.rejectApplication(req.tenant._id, req.params.id, req.user, req.body.reason);
+    res.json({
+      id: application._id,
+      name: application.name,
+      email: application.email,
+      status: application.status,
+      rejectionReason: application.rejectionReason,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function listTeamMembers(req, res, next) {
+  try {
+    const members = await agencyService.listTeamMembers(req.tenant._id);
+    res.json(members);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function removeTeamMember(req, res, next) {
+  try {
+    await agencyService.removeTeamMember(req.tenant._id, req.params.id, req.user);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  getPerformance,
+  getBranding,
+  getProfile,
+  updateBranding,
+  updateProfile,
+  inviteUser,
+  listInvites,
+  revokeInvite,
+  acceptInvite,
+  applyToAgency,
+  listApplications,
+  approveApplication,
+  rejectApplication,
+  listTeamMembers,
+  removeTeamMember,
+};

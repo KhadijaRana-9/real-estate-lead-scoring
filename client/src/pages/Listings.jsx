@@ -1,16 +1,23 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import * as api from '../api/endpoints'
 import PropertyCard from '../components/PropertyCard'
 import SkeletonCard from '../components/SkeletonCard'
 import EmptyState from '../components/EmptyState'
 import FilterPanel from '../components/FilterPanel'
 import Pagination from '../components/Pagination'
+import ScrollReveal from '../components/ScrollReveal'
+import Button from '../components/ui/Button'
+import { useAuth } from '../context/AuthContext'
+import { fadeUp, staggerItem } from '../motion/variants'
 
 const EMPTY_FILTERS = { city: '', type: '', bedrooms: '', minPrice: '', maxPrice: '', sort: '', featured: false }
 const PAGE_SIZE = 12
 
 export default function Listings() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [filters, setFilters] = useState({
     ...EMPTY_FILTERS,
@@ -20,6 +27,21 @@ export default function Listings() {
   const [result, setResult] = useState({ items: [], pagination: { totalPages: 1, total: 0 } })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+
+  // This page is the public, cross-tenant DreamHomes marketplace browser
+  // (GET /api/properties has no auth - it always resolves the
+  // host/?workspace=/default tenant, same for every visitor). An agent
+  // or agency_admin has their own tenant-scoped inventory instead, at
+  // the URL the app's own Navbar already sends them to ('Listings' ->
+  // /dashboard?tab=My%20Listings, backed by the tenant-safe
+  // GET /properties/mine) - redirect here too so there's no path,
+  // including a direct URL/bookmark, where they land on this page and
+  // could mistake the marketplace's properties for their own agency's.
+  useEffect(() => {
+    if (user?.role === 'agent' || user?.role === 'agency_admin') {
+      navigate('/dashboard?tab=My%20Listings', { replace: true })
+    }
+  }, [user, navigate])
 
   const fetchListings = useCallback(() => {
     setLoading(true)
@@ -58,14 +80,14 @@ export default function Listings() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mb-6 flex items-baseline justify-between">
+      <motion.div initial="hidden" animate="visible" variants={fadeUp} className="mb-6 flex items-baseline justify-between">
         <h1 className="text-2xl font-bold">Properties for Sale</h1>
         {!loading && !error && (
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {result.pagination.total.toLocaleString()} listings found
           </p>
         )}
-      </div>
+      </motion.div>
 
       <FilterPanel filters={filters} onChange={handleFilterChange} onClear={clearFilters} />
 
@@ -74,11 +96,7 @@ export default function Listings() {
           <EmptyState
             title="Network error"
             message="We couldn't reach the server. Please try again."
-            action={
-              <button onClick={fetchListings} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white">
-                Retry
-              </button>
-            }
+            action={<Button onClick={fetchListings}>Retry</Button>}
           />
         ) : loading ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -88,17 +106,17 @@ export default function Listings() {
           <EmptyState
             title="No properties found"
             message="Try adjusting your filters or search a different city."
-            action={
-              <button onClick={clearFilters} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white">
-                Clear Filters
-              </button>
-            }
+            action={<Button onClick={clearFilters}>Clear Filters</Button>}
           />
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {result.items.map((p, i) => <PropertyCard key={p._id} property={p} index={i} />)}
-            </div>
+            <ScrollReveal stagger className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {result.items.map((p, i) => (
+                <motion.div key={p._id} variants={staggerItem}>
+                  <PropertyCard property={p} index={i} />
+                </motion.div>
+              ))}
+            </ScrollReveal>
             <Pagination page={page} totalPages={result.pagination.totalPages} onChange={setPage} />
           </>
         )}

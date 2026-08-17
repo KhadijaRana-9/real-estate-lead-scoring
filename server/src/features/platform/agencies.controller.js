@@ -36,6 +36,24 @@ async function reactivate(req, res, next) {
   }
 }
 
+async function approve(req, res, next) {
+  try {
+    const agency = await agenciesService.approveAgency(req.params.id, req.user);
+    res.json(agency);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function reject(req, res, next) {
+  try {
+    const agency = await agenciesService.rejectAgency(req.params.id, req.body.reason, req.user);
+    res.json(agency);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function setVerified(req, res, next) {
   try {
     const agency = await agenciesService.setVerified(req.params.id, req.body.verified, req.user);
@@ -63,4 +81,4 @@ async function remove(req, res, next) {
   }
 }
 
-module.exports = { list, create, suspend, reactivate, setVerified, setFeatured, remove };
+module.exports = { list, create, suspend, reactivate, approve, reject, setVerified, setFeatured, remove };

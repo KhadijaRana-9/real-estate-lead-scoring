@@ -1,16 +1,13 @@
 import { motion } from 'framer-motion'
 import ScoreRing from './ScoreRing'
+import Badge from './ui/Badge'
 
-const STATUS_STYLES = {
-  hot: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
-  warm: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300',
-  cold: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
-}
+const STATUS_TONE = { hot: 'danger', warm: 'warning', cold: 'info' }
 
 const BAR_COLORS = {
-  hot: 'bg-red-500',
-  warm: 'bg-orange-500',
-  cold: 'bg-blue-500',
+  hot: 'bg-danger-500',
+  warm: 'bg-warning-500',
+  cold: 'bg-info-500',
 }
 
 export default function LeadScoreBreakdown({ score, status, breakdown }) {
@@ -25,9 +22,7 @@ export default function LeadScoreBreakdown({ score, status, breakdown }) {
     <div className="flex items-start gap-4">
       <ScoreRing score={score} status={status} />
       <div className="flex-1 space-y-2">
-        <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold capitalize ${STATUS_STYLES[status]}`}>
-          {status} lead
-        </span>
+        <Badge tone={STATUS_TONE[status]} className="capitalize">{status} lead</Badge>
         <div className="space-y-1.5">
           {items.map((item) => (
             <div key={item.label}>

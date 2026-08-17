@@ -1,11 +1,11 @@
 import { motion } from 'framer-motion'
-import { FiHome, FiSearch, FiMail, FiBarChart2 } from 'react-icons/fi'
+import { FiHome, FiCheckCircle, FiUsers, FiBarChart2 } from 'react-icons/fi'
 
 const STEPS = [
-  { icon: <FiSearch />, title: 'Search & Filter', text: 'Browse verified listings by city, price, type, and bedrooms.' },
-  { icon: <FiMail />, title: 'Inquire Directly', text: 'Contact the listing agent with your budget and timeline.' },
-  { icon: <FiBarChart2 />, title: 'Smart Lead Scoring', text: 'Every inquiry is scored 0–100 so agents can prioritize hot leads.' },
-  { icon: <FiHome />, title: 'Manage Listings', text: 'Agents get a dashboard to add, edit, and track their properties.' },
+  { icon: <FiCheckCircle />, title: 'Choose a Plan', text: 'Pick the plan that fits your agency and start a free trial or subscribe.' },
+  { icon: <FiHome />, title: 'Set Up Your Agency', text: 'Create your own branded workspace with your listings, agents, and profile.' },
+  { icon: <FiUsers />, title: 'Build Your Team', text: 'Invite agents directly, or let them apply and approve them yourself.' },
+  { icon: <FiBarChart2 />, title: 'Manage Leads & Listings', text: 'Every inquiry is scored 0–100 so your agents can prioritize hot leads.' },
 ]
 
 export default function About() {
@@ -18,9 +18,9 @@ export default function About() {
       >
         <h1 className="font-heading text-3xl font-extrabold sm:text-4xl">About DreamHomes</h1>
         <p className="mx-auto mt-4 max-w-2xl text-gray-600 dark:text-gray-300">
-          DreamHomes is a real-estate listings portal built to make property search and lead
-          management simple — for customers looking for a home, and for agents managing their
-          listings and inquiries.
+          DreamHomes is a SaaS platform that gives real estate agencies everything they need to run
+          their business online — listings, agent and team management, explainable lead scoring, and
+          a fully branded workspace of their own.
         </p>
       </motion.div>
 

@@ -4,6 +4,7 @@ import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import AnimatedPage from './components/AnimatedPage'
 import ScrollProgressBar from './components/ScrollProgressBar'
+import ScrollToTop from './components/ScrollToTop'
 import Home from './pages/Home'
 import Listings from './pages/Listings'
 import PropertyDetail from './pages/PropertyDetail'
@@ -12,6 +13,12 @@ import AgencyProfile from './pages/AgencyProfile'
 import AgencyCompare from './pages/AgencyCompare'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import AgencyRegister from './pages/AgencyRegister'
+import Pricing from './pages/Pricing'
+import RegistrationPending from './pages/RegistrationPending'
+import AcceptInvite from './pages/AcceptInvite'
+import ApplyToAgency from './pages/ApplyToAgency'
+import TrialExpired from './pages/TrialExpired'
 import AgentDashboard from './pages/AgentDashboard'
 import About from './pages/About'
 import NotFound from './pages/NotFound'
@@ -28,6 +35,7 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <ScrollToTop />
       <ScrollProgressBar />
       {!isPlatformRoute && <Navbar />}
       <main className="flex-1">
@@ -39,8 +47,14 @@ export default function App() {
             <Route path="/agencies" element={<AnimatedPage><AgenciesMarketplace /></AnimatedPage>} />
             <Route path="/agencies/compare" element={<AnimatedPage><AgencyCompare /></AnimatedPage>} />
             <Route path="/agencies/:slug" element={<AnimatedPage><AgencyProfile /></AnimatedPage>} />
+            <Route path="/agencies/:slug/apply" element={<AnimatedPage><ApplyToAgency /></AnimatedPage>} />
+            <Route path="/accept-invite" element={<AnimatedPage><AcceptInvite /></AnimatedPage>} />
             <Route path="/login" element={<AnimatedPage><Login /></AnimatedPage>} />
             <Route path="/signup" element={<AnimatedPage><Signup /></AnimatedPage>} />
+            <Route path="/pricing" element={<AnimatedPage><Pricing /></AnimatedPage>} />
+            <Route path="/register" element={<AnimatedPage><AgencyRegister /></AnimatedPage>} />
+            <Route path="/register/pending" element={<AnimatedPage><RegistrationPending /></AnimatedPage>} />
+            <Route path="/trial-expired" element={<AnimatedPage><TrialExpired /></AnimatedPage>} />
             <Route path="/about" element={<AnimatedPage><About /></AnimatedPage>} />
             <Route
               path="/dashboard"

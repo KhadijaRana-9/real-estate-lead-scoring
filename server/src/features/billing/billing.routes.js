@@ -10,7 +10,7 @@ const router = express.Router();
 
 // Billing is agency_admin-only - agents and customers never see invoices
 // or plan/usage data for the whole agency.
-router.use(auth, resolveTenant(), requireRole('agency_admin'));
+router.use(auth, requireRole('agency_admin'), resolveTenant());
 
 router.get('/subscription', controller.getSubscription);
 router.get('/invoices', controller.listInvoices);

@@ -23,6 +23,48 @@ describe('Security regressions', () => {
       expect(results.slice(3).every((r) => r.status === 429)).toBe(true);
       expect(results[3].body.message).toBe('Too many requests. Please try again later.');
     });
+
+    // BUG-002 regression: /auth/login used to share ONE authLimiter
+    // instance with /auth/signup and /agency-registrations, so a user
+    // retrying a login a few times (e.g. after BUG-001's false "invalid
+    // password") could exhaust the shared budget and get locked out of
+    // signup/registration too, not just login. rateLimiters.js now exports
+    // separate loginLimiter/signupLimiter instances instead. Real
+    // production values (10/15min) can't be exercised directly here since
+    // NODE_ENV=test bumps every real limiter's limit to 100000 - this
+    // proves the STRUCTURAL fix (independent instances = independent
+    // counters) the same way the isolated-limiter test above does.
+    it('separate limiter instances do not share a budget; the same instance reused across routes does', async () => {
+      const separateApp = express();
+      const limiterA = rateLimit({ windowMs: 60 * 1000, limit: 2, standardHeaders: true, legacyHeaders: false, message: { message: 'Too many attempts. Please try again later.' } });
+      const limiterB = rateLimit({ windowMs: 60 * 1000, limit: 2, standardHeaders: true, legacyHeaders: false, message: { message: 'Too many attempts. Please try again later.' } });
+      separateApp.post('/route-a', limiterA, (req, res) => res.json({ ok: true }));
+      separateApp.post('/route-b', limiterB, (req, res) => res.json({ ok: true }));
+
+      // Exhaust route A's budget (limit 2).
+      await request(separateApp).post('/route-a');
+      await request(separateApp).post('/route-a');
+      const aBlocked = await request(separateApp).post('/route-a');
+      expect(aBlocked.status).toBe(429);
+
+      // Route B, on its OWN limiter instance, is unaffected.
+      const bStillWorks = await request(separateApp).post('/route-b');
+      expect(bStillWorks.status).toBe(200);
+
+      // Sanity check the test methodology itself: reusing the SAME
+      // instance across two routes (the old, buggy wiring) DOES let one
+      // route's traffic exhaust the other's budget - proving this test
+      // would actually have caught the original bug.
+      const sharedApp = express();
+      const sharedLimiter = rateLimit({ windowMs: 60 * 1000, limit: 2, standardHeaders: true, legacyHeaders: false, message: { message: 'Too many attempts. Please try again later.' } });
+      sharedApp.post('/route-a', sharedLimiter, (req, res) => res.json({ ok: true }));
+      sharedApp.post('/route-b', sharedLimiter, (req, res) => res.json({ ok: true }));
+
+      await request(sharedApp).post('/route-a');
+      await request(sharedApp).post('/route-a');
+      const bBlockedByA = await request(sharedApp).post('/route-b');
+      expect(bBlockedByA.status).toBe(429);
+    });
   });
 
   describe('regex / NoSQL injection hardening on the public search endpoint', () => {

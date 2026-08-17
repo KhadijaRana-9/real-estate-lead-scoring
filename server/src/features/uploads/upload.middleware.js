@@ -43,4 +43,10 @@ module.exports = {
   imagesUpload: handle(imagesUpload),
   documentsUpload: handle(documentsUpload),
   videosUpload: handle(videosUpload),
+  // Exported (not just the pre-built single-field middlewares above) so
+  // a route needing a custom multer config - e.g. agencyRegistration's
+  // `.fields()` with several distinct named files in one request - still
+  // gets the same JSON error shape instead of multer's raw error object.
+  handle,
+  MAX_DOCUMENT_SIZE,
 };

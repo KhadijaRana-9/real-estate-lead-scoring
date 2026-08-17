@@ -22,7 +22,15 @@ function unauthorized(message) {
 // agencyId is the resolved tenant (req.tenant._id from resolveTenant
 // middleware), never a client-supplied value - signup/login are always
 // scoped to whichever agency the request was resolved against.
-async function signup({ name, email, password, role, agencyId }) {
+//
+// role is always 'customer' here, regardless of what's requested - the
+// only account type public self-signup may ever create. An 'agent'
+// membership must come from agency.service.js's createActiveMembership
+// (invite-accept or application-approval), which authoritatively checks
+// the plan's agent-seat limit first. auth.schema.js already rejects any
+// role other than 'customer' at the HTTP boundary; this is the
+// service-layer half of that same defense-in-depth pair.
+async function signup({ name, email, password, agencyId }) {
   const existing = await User.findOne({ agencyId, email: email.toLowerCase() });
   if (existing) {
     const err = new Error('An account with this email already exists');
@@ -30,15 +38,45 @@ async function signup({ name, email, password, role, agencyId }) {
     throw err;
   }
 
-  const allowedRole = ['agent', 'customer'].includes(role) ? role : 'customer';
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-  const user = await User.create({ name, email, passwordHash, role: allowedRole, agencyId });
+  const user = await User.create({ name, email, passwordHash, role: 'customer', agencyId });
 
   return user;
 }
 
+const AGENCY_LOGIN_BLOCK_MESSAGES = {
+  pending: 'Your agency registration is still pending admin approval. Please check back soon.',
+  rejected: 'Your agency registration was not approved. Contact support for details.',
+  suspended: 'This workspace has been suspended.',
+};
+
 async function login({ email, password, agencyId }) {
-  const user = await User.findOne({ agencyId, email: email.toLowerCase() });
+  const normalizedEmail = email.toLowerCase();
+  let user;
+
+  if (agencyId) {
+    user = await User.findOne({ agencyId, email: normalizedEmail });
+  } else {
+    // No explicit workspace was resolved for this request (see
+    // auth.routes.js's /login route, which deliberately does not fall
+    // back to DEFAULT_AGENCY_SLUG - see resolveTenant.js). Guessing a
+    // tenant here would search the wrong agency's users entirely (this
+    // was BUG-001: a correct password reported as "Invalid email or
+    // password" whenever the login page was reached without ?workspace=,
+    // e.g. via the Navbar/Footer links). The account itself is the real
+    // source of truth for which agency this is, so resolve by identity
+    // instead. Email is unique per-agency, not globally (see
+    // auth.model.js's compound index), so this occasionally matches more
+    // than one real account across different agencies.
+    const candidates = await User.find({ email: normalizedEmail }).limit(2);
+    if (candidates.length > 1) {
+      const err = new Error("This email is used in more than one agency workspace. Please log in from your agency's own workspace link.");
+      err.status = 409;
+      throw err;
+    }
+    user = candidates[0] || null;
+  }
+
   if (!user) {
     throw unauthorized('Invalid email or password');
   }
@@ -46,6 +84,24 @@ async function login({ email, password, agencyId }) {
   const matches = await bcrypt.compare(password, user.passwordHash);
   if (!matches) {
     throw unauthorized('Invalid email or password');
+  }
+
+  // Checked after password match (not before) so a wrong-password
+  // attempt on a pending/suspended agency still reads as "invalid email
+  // or password" rather than leaking the agency's approval state to an
+  // unauthenticated guesser. Only 'active' may proceed - this is the
+  // real gate self-registered agencies (agencyRegistration feature) sit
+  // behind until a super_admin approves them; previously nothing here
+  // checked agency status at all (only rotateRefreshToken did, so a
+  // suspended agency's user could still complete a fresh login and just
+  // fail on their next token refresh - closed here too for consistency).
+  //
+  // Uses user.agencyId (the matched account's real agency) rather than
+  // the agencyId parameter, which can be null on the identity-lookup
+  // path above.
+  const agency = await Agency.findById(user.agencyId).select('status');
+  if (agency && agency.status !== 'active') {
+    throw unauthorized(AGENCY_LOGIN_BLOCK_MESSAGES[agency.status] || 'This workspace is not currently active.');
   }
 
   return user;

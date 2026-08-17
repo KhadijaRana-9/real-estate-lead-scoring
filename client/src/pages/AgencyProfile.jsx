@@ -13,6 +13,7 @@ import PropertyCard from '../components/PropertyCard'
 import AgencyCard from '../components/AgencyCard'
 import SkeletonCard from '../components/SkeletonCard'
 import EmptyState from '../components/EmptyState'
+import ScrollReveal from '../components/ScrollReveal'
 import { formatDate } from '../utils/format'
 import { fadeUp, staggerContainer } from '../motion/variants'
 
@@ -299,6 +300,13 @@ export default function AgencyProfile() {
     )
   }
 
+  // Anonymous visitors browse the full public profile directly - no
+  // role-choice gate in front of it. Every section below already handles
+  // !user gracefully at the point of action (FollowButton/useWishlist show
+  // a "log in to..." message instead of crashing, ReviewForm simply
+  // doesn't render, "Apply as an Agent" was already public) - none of that
+  // required changes here, since those checks were written defensively
+  // even back when only authenticated users could ever reach this page.
   const stats = agency.stats || {}
   const mapsUrl = agency.officeLocations?.[0]?.lat
     ? `https://www.google.com/maps/search/?api=1&query=${agency.officeLocations[0].lat},${agency.officeLocations[0].lng}`
@@ -385,7 +393,7 @@ export default function AgencyProfile() {
             )}
 
             {/* Featured Listings */}
-            <section>
+            <ScrollReveal as="section">
               <h2 className="mb-3 text-lg font-bold">Featured Listings</h2>
               {featuredListings === null ? (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{Array.from({ length: 2 }).map((_, i) => <SkeletonCard key={i} />)}</div>
@@ -393,13 +401,13 @@ export default function AgencyProfile() {
                 <p className="text-sm text-gray-400">No featured listings right now.</p>
               ) : (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {featuredListings.map((p, i) => <PropertyCard key={p._id} property={p} index={i} />)}
+                  {featuredListings.map((p, i) => <PropertyCard key={p._id} property={p} index={i} workspace={slug} />)}
                 </div>
               )}
-            </section>
+            </ScrollReveal>
 
             {/* Latest Listings */}
-            <section>
+            <ScrollReveal as="section">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-lg font-bold">Latest Listings</h2>
                 <Link to={`/listings?workspace=${slug}`} className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-400">
@@ -412,18 +420,22 @@ export default function AgencyProfile() {
                 <EmptyState title="No listings yet" message="This agency hasn't published any properties yet." />
               ) : (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {listings.map((p, i) => <PropertyCard key={p._id} property={p} index={i} />)}
+                  {listings.map((p, i) => <PropertyCard key={p._id} property={p} index={i} workspace={slug} />)}
                 </div>
               )}
-            </section>
+            </ScrollReveal>
 
             {/* Agents */}
             {agency.agents?.length > 0 && (
-              <section>
+              <ScrollReveal as="section" stagger>
                 <h2 className="mb-3 text-lg font-bold">Agents</h2>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {agency.agents.map((agent) => (
-                    <div key={agent._id} className="flex items-center gap-2 rounded-xl border border-gray-200 p-3 dark:border-gray-800">
+                    <motion.div
+                      key={agent._id}
+                      variants={fadeUp}
+                      className="flex items-center gap-2 rounded-xl border border-gray-200 p-3 transition-shadow hover:shadow-md dark:border-gray-800"
+                    >
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300">
                         {agent.name[0]}
                       </div>
@@ -431,14 +443,14 @@ export default function AgencyProfile() {
                         <p className="truncate text-sm font-medium">{agent.name}</p>
                         <p className="truncate text-xs text-gray-400">{agent.email}</p>
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
-              </section>
+              </ScrollReveal>
             )}
 
             {/* Reviews */}
-            <section>
+            <ScrollReveal as="section">
               <h2 className="mb-3 flex items-center gap-2 text-lg font-bold">
                 Reviews
                 {stats.reviewCount > 0 && (
@@ -461,11 +473,11 @@ export default function AgencyProfile() {
                   ))}
                 </div>
               )}
-            </section>
+            </ScrollReveal>
 
             {/* Company story - only rendered when an admin has actually filled it in */}
             {(agency.ceoMessage || agency.mission || agency.vision) && (
-              <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <ScrollReveal as="section" className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {agency.mission && (
                   <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
                     <h3 className="mb-1 text-sm font-semibold text-brand-600 dark:text-brand-400">Our Mission</h3>
@@ -484,11 +496,11 @@ export default function AgencyProfile() {
                     <p className="text-sm text-gray-600 dark:text-gray-300">{agency.ceoMessage}</p>
                   </div>
                 )}
-              </section>
+              </ScrollReveal>
             )}
 
             {agency.timeline?.length > 0 && (
-              <section>
+              <ScrollReveal as="section">
                 <h2 className="mb-3 text-lg font-bold">Our Journey</h2>
                 <div className="space-y-3 border-l-2 border-brand-200 pl-4 dark:border-brand-900">
                   {[...agency.timeline].sort((a, b) => a.year - b.year).map((event, i) => (
@@ -499,35 +511,39 @@ export default function AgencyProfile() {
                     </div>
                   ))}
                 </div>
-              </section>
+              </ScrollReveal>
             )}
 
             {agency.awards?.length > 0 && (
-              <section>
+              <ScrollReveal as="section" stagger>
                 <h2 className="mb-3 text-lg font-bold">Awards &amp; Recognition</h2>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {agency.awards.map((award, i) => (
-                    <div key={i} className="flex items-center gap-3 rounded-xl border border-gray-200 p-3 dark:border-gray-800">
+                    <motion.div
+                      key={i}
+                      variants={fadeUp}
+                      className="flex items-center gap-3 rounded-xl border border-gray-200 p-3 transition-shadow hover:shadow-md dark:border-gray-800"
+                    >
                       <FiAward className="shrink-0 text-amber-500" size={20} />
                       <div>
                         <p className="text-sm font-medium">{award.title}</p>
                         <p className="text-xs text-gray-400">{[award.issuer, award.year].filter(Boolean).join(' · ')}</p>
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
-              </section>
+              </ScrollReveal>
             )}
 
             {agency.officeGallery?.length > 0 && (
-              <section>
+              <ScrollReveal as="section">
                 <h2 className="mb-3 text-lg font-bold">Office Gallery</h2>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {agency.officeGallery.map((url, i) => (
                     <img key={i} src={url} alt="" className="aspect-square rounded-lg object-cover" />
                   ))}
                 </div>
-              </section>
+              </ScrollReveal>
             )}
           </div>
 
@@ -565,6 +581,15 @@ export default function AgencyProfile() {
                   </a>
                 )}
               </div>
+
+              {(!user || user.role === 'customer') && (
+                <Link
+                  to={`/agencies/${slug}/apply`}
+                  className="mt-4 flex items-center justify-center gap-1.5 rounded-lg border border-brand-300 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50 dark:border-brand-800 dark:text-brand-400 dark:hover:bg-brand-950"
+                >
+                  <FiUsers size={14} /> Apply as an Agent
+                </Link>
+              )}
 
               {Object.values(agency.socialMedia || {}).some(Boolean) && (
                 <div className="mt-4 flex gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
@@ -611,7 +636,7 @@ export default function AgencyProfile() {
               <div>
                 <h3 className="mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400">Related Agencies</h3>
                 <div className="space-y-4">
-                  {agency.relatedAgencies.map((a, i) => <AgencyCard key={a._id} agency={a} index={i} view="list" />)}
+                  {agency.relatedAgencies.map((a, i) => <AgencyCard key={a._id} agency={a} index={i} />)}
                 </div>
               </div>
             )}

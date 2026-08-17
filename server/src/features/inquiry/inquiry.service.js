@@ -1,6 +1,8 @@
 const inquiryRepository = require('./inquiry.repository');
+const Inquiry = require('./inquiry.model');
 const propertyRepository = require('../property/property.repository');
 const { calculateLeadScore } = require('../../shared/utils/leadScoring');
+const { stripHtmlTags } = require('../../shared/utils/sanitizeText');
 const auditLog = require('../audit/auditLog.service');
 
 async function createInquiry(tenantId, { propertyId, customer, message, budget, moveTimeline }) {
@@ -15,11 +17,19 @@ async function createInquiry(tenantId, { propertyId, customer, message, budget, 
     throw err;
   }
 
+  // message is customer-submitted free text with no legitimate use for
+  // HTML tag syntax - stripping tags at write time (not entity-escaping,
+  // which would double-escape when the frontend renders this via React's
+  // own auto-escaping) closes off every current AND future rendering
+  // context (agent dashboard, any future HTML email digest/export) at the
+  // source, rather than relying solely on each consumer to render safely.
+  const sanitizedMessage = stripHtmlTags(message);
+
   const { total, status, breakdown } = calculateLeadScore({
     budget,
     price: property.price,
     moveTimeline,
-    message,
+    message: sanitizedMessage,
     phone: customer.phone,
     propertyViews: property.views,
   });
@@ -27,7 +37,7 @@ async function createInquiry(tenantId, { propertyId, customer, message, budget, 
   return inquiryRepository.create(tenantId, {
     property: property._id,
     customer,
-    message,
+    message: sanitizedMessage,
     budget,
     moveTimeline,
     score: total,
@@ -44,6 +54,33 @@ async function listInquiriesForAgent(tenantId, requester) {
     .find(tenantId, { property: { $in: propertyIds } })
     .populate('property', 'title city price')
     .sort({ score: -1, createdAt: -1 });
+}
+
+// Real aggregation over Inquiry, grouped by property - the only honest
+// way to answer "which property gets the most inquiries", distinct from
+// favorite-count (customer interest before contacting) or view-count
+// (browsing interest) - this is the strongest real signal, actual
+// expressed contact intent.
+async function getMostInquiredProperties(tenantId, { limit = 6, agentId } = {}) {
+  const results = await Inquiry.aggregate([
+    { $match: { agencyId: tenantId } },
+    { $group: { _id: '$property', inquiryCount: { $sum: 1 } } },
+    { $sort: { inquiryCount: -1 } },
+    { $limit: Math.max(limit * 3, limit) },
+  ]);
+  if (!results.length) return [];
+
+  const propertyIds = results.map((r) => r._id);
+  const propertyFilter = agentId ? { _id: { $in: propertyIds }, agent: agentId, status: 'available' } : { _id: { $in: propertyIds }, status: 'available' };
+  const properties = await propertyRepository.find(tenantId, propertyFilter);
+  const propertyById = new Map(properties.map((p) => [p._id.toString(), p]));
+  const countById = new Map(results.map((r) => [r._id.toString(), r.inquiryCount]));
+
+  return results
+    .map((r) => propertyById.get(r._id.toString()))
+    .filter(Boolean)
+    .slice(0, limit)
+    .map((p) => ({ ...p.toObject(), inquiryCount: countById.get(p._id.toString()) }));
 }
 
 const { PIPELINE_STAGES } = require('./pipelineStages');
@@ -102,4 +139,4 @@ async function moveLeadStage(tenantId, inquiryId, stage, requester) {
   return updated;
 }
 
-module.exports = { createInquiry, listInquiriesForAgent, getPipeline, moveLeadStage, PIPELINE_STAGES };
+module.exports = { createInquiry, listInquiriesForAgent, getPipeline, moveLeadStage, getMostInquiredProperties, PIPELINE_STAGES };

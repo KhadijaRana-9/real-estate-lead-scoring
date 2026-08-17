@@ -25,8 +25,54 @@ const apiLimiter = rateLimit({
   message: { message: 'Too many requests. Please try again later.' },
 });
 
-// Tight window on credential-guessing surfaces (signup/login/refresh).
+// Tight window on credential-guessing surfaces (refresh, platform login,
+// invite-accept, apply-to-agency - see their respective routes files).
 const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: isTestEnv ? 100000 : 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many attempts. Please try again later.' },
+});
+
+// Same budget as authLimiter, but a SEPARATE instance dedicated to
+// /auth/login only (BUG-002 fix). Previously login shared authLimiter's one
+// counter with signup/registration, so a user retrying a few times after a
+// failed login attempt (very plausible - see BUG-001, which made correct
+// passwords look wrong) could burn through the shared budget and get
+// locked out of signing up or registering a brand-new agency too, not just
+// logging in. Independent express-rate-limit instances get independent
+// counters even on the same IP, so exhausting one no longer blocks the
+// other - same abuse-protection strength (identical windowMs/limit), just
+// scoped to the one surface it actually protects.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: isTestEnv ? 100000 : 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many attempts. Please try again later.' },
+});
+
+// Same budget again, dedicated to identity-creation surfaces that were
+// previously sharing authLimiter's counter with /auth/login: /auth/signup
+// and /agency-registrations (BUG-002 fix, see loginLimiter above).
+const signupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: isTestEnv ? 100000 : 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many attempts. Please try again later.' },
+});
+
+// Same budget again, dedicated to /auth/refresh only. Refresh is
+// fundamentally different traffic from the rest of authLimiter's
+// consumers (/platform/login, /agency/invites/accept, /agency/applications)
+// - it fires automatically on any 401 anywhere in the app, not from a
+// single deliberate human action, so it was able to silently exhaust the
+// shared budget those other, rare, one-off actions depend on (same class
+// of bug as BUG-002 above, just on the token-refresh surface instead of
+// login/signup).
+const refreshLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: isTestEnv ? 100000 : 10,
   standardHeaders: true,
@@ -44,13 +90,15 @@ const inquiryLimiter = rateLimit({
   message: { message: 'Too many inquiries submitted. Please try again later.' },
 });
 
-// The AI Assistant (see features/ai) runs fully offline - local
-// keyword/entity matching against MongoDB-backed tools, no paid LLM API
-// call behind it - so this doesn't need the tight per-request cost
-// protection a real LLM integration would. Still capped independently of
-// the general API limiter as a backstop against a runaway client loop,
-// just at a limit generous enough for a normal back-and-forth
-// conversation not to trip it.
+// The AI Assistant (see features/ai) runs fully offline by default -
+// local keyword/entity matching against MongoDB-backed tools. Since
+// Phase 3, low-confidence turns can escalate to an optional, separately-
+// configured LLM provider (features/ai/llm/) - most traffic still stays
+// on the free/instant deterministic path, so this limit remains sized as
+// a backstop against a runaway client loop rather than a per-request
+// cost control. Revisit with real usage data once LLM escalation is
+// live in production; a stricter, dedicated cap is intentionally not
+// added speculatively (see the Phase 3 plan's rationale).
 const aiLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   limit: isTestEnv ? 100000 : 120,
@@ -69,4 +117,4 @@ const uploadLimiter = rateLimit({
   message: { message: 'Too many uploads. Please wait a few minutes and try again.' },
 });
 
-module.exports = { apiLimiter, authLimiter, inquiryLimiter, aiLimiter, uploadLimiter };
+module.exports = { apiLimiter, authLimiter, loginLimiter, signupLimiter, refreshLimiter, inquiryLimiter, aiLimiter, uploadLimiter };

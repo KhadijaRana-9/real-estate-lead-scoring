@@ -6,7 +6,7 @@ const controller = require('./reports.controller');
 
 const router = express.Router();
 
-router.use(auth, resolveTenant(), requireRole('agent', 'agency_admin'));
+router.use(auth, requireRole('agent', 'agency_admin'), resolveTenant());
 
 router.get('/properties.csv', controller.properties);
 router.get('/leads.csv', controller.leads);

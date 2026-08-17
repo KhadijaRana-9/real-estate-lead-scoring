@@ -3,6 +3,20 @@
 // property's own fields, no LLM or external API involved. Every word
 // here is derived from data the agent already entered; nothing is
 // invented, so there's nothing to fabricate or hallucinate.
+//
+// Phase 3 (Listing AI) adds the reverse direction: extractFields() below
+// turns a rough, pasted listing description into pre-fillable form
+// fields, reusing the exact same NLU extractors the AI Assistant's
+// property search already relies on (localEngine/entities.js) - no
+// second extraction system.
+const {
+  extractCity,
+  extractType,
+  extractBedrooms,
+  extractBathrooms,
+  extractListingPrice,
+  extractListingArea,
+} = require('./localEngine/entities');
 
 function titleCase(str) {
   return str.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
@@ -72,4 +86,31 @@ async function assist(action, property) {
   return { action, suggestion: generator(property || {}) };
 }
 
-module.exports = { assist };
+// Turns free text ("3 bed house in DHA Lahore, 2 kanal, asking 4.5
+// crore") into pre-fillable listing fields. Every field is either a real
+// extraction result or `undefined` - never guessed/defaulted, so the
+// caller (the wizard, once wired up) can tell exactly what it still
+// needs to ask the agent for. `locality` isn't attempted here - it has
+// no dedicated extractor (extractCity only recognizes KNOWN_CITIES plus
+// the generic "in X" capture, which is already ambiguous between a city
+// and a locality) and inventing a second, looser heuristic just for this
+// endpoint isn't worth the false-positive risk.
+function extractFields(text) {
+  const areaInfo = extractListingArea(text) || {};
+  const fields = {
+    city: extractCity(text),
+    type: extractType(text),
+    bedrooms: extractBedrooms(text),
+    bathrooms: extractBathrooms(text),
+    price: extractListingPrice(text),
+    area: areaInfo.area,
+    areaUnit: areaInfo.areaUnit,
+  };
+  const foundFields = Object.entries(fields)
+    .filter(([, value]) => value !== undefined)
+    .map(([key]) => key);
+
+  return { fields, foundFields };
+}
+
+module.exports = { assist, extractFields };

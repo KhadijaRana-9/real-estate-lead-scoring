@@ -20,11 +20,13 @@ describe('Property CRUD', () => {
   let agency;
   let agentA;
   let agentB;
+  let agencyAdmin;
 
   beforeAll(async () => {
     agency = await createAgency();
     agentA = await signupUser(app, agency.slug, { role: 'agent' });
     agentB = await signupUser(app, agency.slug, { role: 'agent' });
+    agencyAdmin = await signupUser(app, agency.slug, { role: 'agency_admin' });
   });
 
   function authHeader(session) {
@@ -130,6 +132,16 @@ describe('Property CRUD', () => {
       expect(res.status).toBe(403);
     });
 
+    it('agency_admin bypasses ownership and can update any agent\'s listing in their agency', async () => {
+      const created = await request(app).post('/api/properties').set(authHeader(agentA)).send(validProperty);
+      const res = await request(app)
+        .put(`/api/properties/${created.body._id}`)
+        .set(authHeader(agencyAdmin))
+        .send({ title: 'Updated by admin' });
+      expect(res.status).toBe(200);
+      expect(res.body.title).toBe('Updated by admin');
+    });
+
     it('mass-assignment on update: privileged fields cannot be forged', async () => {
       const created = await request(app).post('/api/properties').set(authHeader(agentA)).send(validProperty);
       const res = await request(app)
@@ -157,6 +169,14 @@ describe('Property CRUD', () => {
       expect(res.status).toBe(403);
     });
 
+    it('agency_admin bypasses ownership and can delete any agent\'s listing in their agency', async () => {
+      const created = await request(app).post('/api/properties').set(authHeader(agentA)).send(validProperty);
+      const res = await request(app).delete(`/api/properties/${created.body._id}`).set(authHeader(agencyAdmin));
+      expect(res.status).toBe(204);
+      const getRes = await request(app).get(`/api/properties/${created.body._id}?workspace=${agency.slug}`);
+      expect(getRes.status).toBe(404);
+    });
+
     it('owner can delete their own listing', async () => {
       const created = await request(app).post('/api/properties').set(authHeader(agentA)).send(validProperty);
       const res = await request(app).delete(`/api/properties/${created.body._id}`).set(authHeader(agentA));
@@ -164,6 +184,72 @@ describe('Property CRUD', () => {
 
       const fetchAfterDelete = await request(app).get(`/api/properties/${created.body._id}?workspace=${agency.slug}`);
       expect(fetchAfterDelete.status).toBe(404);
+    });
+  });
+
+  describe('publish (the wizard\'s Step 7 action)', () => {
+    it('a complete draft publishes successfully: status flips to available, publishedAt is set, and it becomes publicly visible', async () => {
+      const draft = await request(app).post('/api/properties/drafts').set(authHeader(agentA)).send(validProperty);
+      expect(draft.body.status).toBe('draft');
+
+      const res = await request(app).patch(`/api/properties/${draft.body._id}/publish`).set(authHeader(agentA));
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('available');
+      expect(res.body.publishedAt).toBeTruthy();
+
+      const publicView = await request(app).get(`/api/properties/${draft.body._id}?workspace=${agency.slug}`);
+      expect(publicView.status).toBe(200);
+
+      const listing = await request(app).get(`/api/properties?workspace=${agency.slug}`);
+      expect(listing.body.items.some((p) => p._id === draft.body._id)).toBe(true);
+    });
+
+    it('rejects publishing a draft missing required fields, reports exactly which ones, and leaves it a draft', async () => {
+      const draft = await request(app)
+        .post('/api/properties/drafts')
+        .set(authHeader(agentA))
+        .send({ title: 'Incomplete Listing' });
+      expect(draft.body.status).toBe('draft');
+
+      const res = await request(app).patch(`/api/properties/${draft.body._id}/publish`).set(authHeader(agentA));
+      expect(res.status).toBe(400);
+      expect(res.body.missing).toEqual(expect.arrayContaining(['city', 'price', 'area']));
+
+      // Still a draft - never leaked to the public browse/detail routes.
+      const publicView = await request(app).get(`/api/properties/${draft.body._id}?workspace=${agency.slug}`);
+      expect(publicView.status).toBe(404);
+      const listing = await request(app).get(`/api/properties?workspace=${agency.slug}`);
+      expect(listing.body.items.some((p) => p._id === draft.body._id)).toBe(false);
+    });
+
+    it('a different agent cannot publish someone else\'s draft', async () => {
+      const draft = await request(app).post('/api/properties/drafts').set(authHeader(agentA)).send(validProperty);
+      const res = await request(app).patch(`/api/properties/${draft.body._id}/publish`).set(authHeader(agentB));
+      expect(res.status).toBe(403);
+    });
+
+    it('agency_admin can publish any agent\'s draft in their agency', async () => {
+      const draft = await request(app).post('/api/properties/drafts').set(authHeader(agentA)).send(validProperty);
+      const res = await request(app).patch(`/api/properties/${draft.body._id}/publish`).set(authHeader(agencyAdmin));
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('available');
+    });
+
+    it('editing an already-published listing does not unpublish it, and it can be published again (idempotent re-publish)', async () => {
+      const draft = await request(app).post('/api/properties/drafts').set(authHeader(agentA)).send(validProperty);
+      await request(app).patch(`/api/properties/${draft.body._id}/publish`).set(authHeader(agentA));
+
+      const edited = await request(app)
+        .put(`/api/properties/${draft.body._id}`)
+        .set(authHeader(agentA))
+        .send({ price: 7000000 });
+      expect(edited.status).toBe(200);
+      expect(edited.body.status).toBe('available');
+      expect(edited.body.price).toBe(7000000);
+
+      const republish = await request(app).patch(`/api/properties/${draft.body._id}/publish`).set(authHeader(agentA));
+      expect(republish.status).toBe(200);
+      expect(republish.body.status).toBe('available');
     });
   });
 });

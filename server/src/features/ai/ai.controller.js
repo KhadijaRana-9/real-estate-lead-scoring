@@ -98,4 +98,16 @@ async function propertyAssist(req, res, next) {
   }
 }
 
-module.exports = { chat, chatStream, list, getOne, update, remove, propertyAssist };
+// Phase 3 (Listing AI) - synchronous/pure (no DB, no LLM), so no await
+// needed, but kept in the same try/catch shape as every other handler
+// here for consistency.
+function extractListingFields(req, res, next) {
+  try {
+    const result = propertyAssistService.extractFields(req.body.text);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { chat, chatStream, list, getOne, update, remove, propertyAssist, extractListingFields };

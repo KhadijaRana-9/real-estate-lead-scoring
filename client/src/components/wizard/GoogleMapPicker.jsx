@@ -49,10 +49,10 @@ export default function GoogleMapPicker({ lat, lng, onChange }) {
 
   if (!MAPS_KEY) {
     return (
-      <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400">
-        <p className="font-medium">Interactive map not connected</p>
+      <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-center text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
+        <p className="font-medium">Map view (optional)</p>
         <p className="mt-1 max-w-xs text-xs">
-          Add <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">VITE_GOOGLE_MAPS_API_KEY</code> to the client environment to enable pin placement, satellite view, and street view. Coordinates below still save normally.
+          Enter coordinates directly below, or pin an exact location on a map by enabling this optional feature later.
         </p>
       </div>
     )

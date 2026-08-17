@@ -8,6 +8,7 @@ const platformAgenciesService = require('../platform/agencies.service');
 const agencyService = require('../agency/agency.service');
 const billingService = require('../billing/billing.service');
 const crmService = require('../crm/crm.service');
+const crmRepository = require('../crm/crm.repository');
 const authService = require('../auth/auth.service');
 const auditLogService = require('../audit/auditLog.service');
 const agencyDirectoryService = require('../marketplace/agencyDirectory.service');
@@ -15,6 +16,22 @@ const developerService = require('../developer/developer.service');
 const projectService = require('../project/project.service');
 const blogService = require('../blog/blog.service');
 const marketService = require('../market/market.service');
+const favoriteService = require('../favorite/favorite.service');
+const propertyReviewService = require('../propertyReview/propertyReview.service');
+const User = require('../auth/auth.model');
+// Phase 5 (Super Admin / Platform AI) - direct model access for genuinely
+// cross-tenant aggregations, same discipline platform/dashboard.service.js
+// and platform/agencies.service.js already use (no tenantId scoping
+// exists or applies at the platform level - these are super_admin-only
+// tools, gated by TOOL_DEFINITIONS.roles below, never by tenant).
+const Agency = require('../agency/agency.model');
+const Property = require('../property/property.model');
+const Inquiry = require('../inquiry/inquiry.model');
+const Favorite = require('../favorite/favorite.model');
+const Task = require('../crm/task.model');
+const { PLANS } = require('../billing/billing.constants');
+const { FAQ_TOPICS } = require('./localEngine/faq');
+const { suggestLeadAction, daysSince } = require('./localEngine/leadActions');
 
 // Every tool the model can call. `roles` is the actual authorization
 // boundary - not a suggestion to the model. Regardless of what a
@@ -35,7 +52,7 @@ const TOOL_DEFINITIONS = {
   // ---- Property ----
   search_properties: {
     name: 'search_properties',
-    description: "Search this agency's available property listings by city, type, price range, or bedrooms.",
+    description: "Search this agency's available property listings by city, type, price range, bedrooms, or area (marla/sqft).",
     parameters: {
       type: 'object',
       properties: {
@@ -44,9 +61,25 @@ const TOOL_DEFINITIONS = {
         minPrice: { type: 'number' },
         maxPrice: { type: 'number' },
         bedrooms: { type: 'number' },
+        minArea: { type: 'number' },
+        maxArea: { type: 'number' },
+        areaUnit: { type: 'string', enum: ['marla', 'sqft'] },
       },
     },
     roles: ['customer', 'agent', 'agency_admin'],
+  },
+  get_my_properties: {
+    name: 'get_my_properties',
+    description: "List the current agent's own property listings (agency_admin sees every agent's) - every status (draft/available/sold), not just publicly available ones. Supports filtering by status/featured and sorting.",
+    parameters: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['draft', 'available', 'sold'] },
+        featured: { type: 'boolean' },
+        sortBy: { type: 'string', enum: ['newest', 'most_viewed', 'least_viewed', 'most_expensive', 'cheapest'] },
+      },
+    },
+    roles: ['agent', 'agency_admin'],
   },
   get_property_details: {
     name: 'get_property_details',
@@ -78,6 +111,48 @@ const TOOL_DEFINITIONS = {
     },
     roles: ['customer', 'agent', 'agency_admin'],
   },
+  get_favorite_properties: {
+    name: 'get_favorite_properties',
+    description: "Get the current user's saved/favorited properties.",
+    parameters: { type: 'object', properties: {} },
+    roles: ['customer', 'agent', 'agency_admin'],
+  },
+  add_favorite_property: {
+    name: 'add_favorite_property',
+    description: 'Save/favorite a property by its ID.',
+    parameters: {
+      type: 'object',
+      properties: { propertyId: { type: 'string' } },
+      required: ['propertyId'],
+    },
+    roles: ['customer', 'agent', 'agency_admin'],
+  },
+  remove_favorite_property: {
+    name: 'remove_favorite_property',
+    description: 'Remove a property from the current user\'s saved/favorited list.',
+    parameters: {
+      type: 'object',
+      properties: { propertyId: { type: 'string' } },
+      required: ['propertyId'],
+    },
+    roles: ['customer', 'agent', 'agency_admin'],
+  },
+  submit_inquiry: {
+    name: 'submit_inquiry',
+    description: 'Submit a real inquiry/expression of interest to the listing agent for a specific property (contact agent about a property). Name and email come from the current logged-in user automatically.',
+    parameters: {
+      type: 'object',
+      properties: {
+        propertyId: { type: 'string' },
+        budget: { type: 'number' },
+        message: { type: 'string' },
+        phone: { type: 'string' },
+        moveTimeline: { type: 'string', enum: ['immediate', '1-3m', '3-6m', 'exploring'] },
+      },
+      required: ['propertyId', 'budget'],
+    },
+    roles: ['customer'],
+  },
   estimate_property_price: {
     name: 'estimate_property_price',
     description: 'Estimate a fair market price for a property given city, area, bedrooms, bathrooms.',
@@ -95,9 +170,12 @@ const TOOL_DEFINITIONS = {
   },
   get_property_analytics: {
     name: 'get_property_analytics',
-    description: 'Get listing analytics: recently added, featured, most viewed, highest priced, lowest priced properties.',
+    description: 'Get listing analytics: recently added, featured, most viewed, highest/lowest priced, top rated, most reviewed, lowest rated, and most favorited (customer interest) properties. topRated/lowestRated only include properties with a minimum number of real reviews (avoids one review looking definitive).',
     parameters: { type: 'object', properties: {} },
-    roles: ['agent', 'agency_admin'],
+    // Broadened to include customer - all of these slices (including
+    // the new rating-based ones) are legitimate marketplace-browsing
+    // questions for a customer, not just internal agent analytics.
+    roles: ['customer', 'agent', 'agency_admin'],
   },
 
   // ---- Lead ----
@@ -151,11 +229,67 @@ const TOOL_DEFINITIONS = {
     parameters: { type: 'object', properties: {} },
     roles: ['super_admin'],
   },
+  // ---- Phase 5 (Super Admin / Platform AI) - all read-only, all
+  // platform-wide (never scoped by any user-supplied agency/tenant id) ----
+  get_platform_agency_health: {
+    name: 'get_platform_agency_health',
+    description: 'Get real, transparent per-agency health signals across the platform: agencies with agents but no property listings, and agencies approaching their plan\'s property or agent limit. Every flag is backed by real counts, never a predictive/churn score.',
+    parameters: { type: 'object', properties: {} },
+    roles: ['super_admin'],
+  },
+  get_platform_priorities: {
+    name: 'get_platform_priorities',
+    description: "Get today's platform-wide priorities for the Super Admin: agencies pending approval, and agencies flagged by get_platform_agency_health's real signals.",
+    parameters: { type: 'object', properties: {} },
+    roles: ['super_admin'],
+  },
+  get_platform_rankings: {
+    name: 'get_platform_rankings',
+    description: 'Get a ranked list of agencies by a real platform-wide metric: property count, inquiry count, favorited-property count, or agent count. Never revenue, views, conversion, or ROI - those are not tracked.',
+    parameters: {
+      type: 'object',
+      properties: { metric: { type: 'string', enum: ['properties', 'inquiries', 'favorites', 'agents'] } },
+      required: ['metric'],
+    },
+    roles: ['super_admin'],
+  },
 
   // ---- Agency ----
   get_agency_performance: {
     name: 'get_agency_performance',
     description: "Get this agency's performance: total properties/agents/leads, average lead score, conversion rate, total views, top agents by views.",
+    parameters: { type: 'object', properties: {} },
+    roles: ['agency_admin'],
+  },
+  // ---- Phase 4 (Agency Admin AI) ----
+  get_agency_overview: {
+    name: 'get_agency_overview',
+    description: "Get a plain-English business overview of this agency: properties (total and active), leads (total, hot/warm/cold), appointments today, and overdue CRM tasks.",
+    parameters: { type: 'object', properties: {} },
+    roles: ['agency_admin'],
+  },
+  get_agency_priorities: {
+    name: 'get_agency_priorities',
+    description: "Get today's prioritized action list for this agency: hot leads that genuinely need follow-up (no open task/appointment yet), today's appointments, and overdue CRM tasks.",
+    parameters: { type: 'object', properties: {} },
+    roles: ['agency_admin'],
+  },
+  get_priority_leads: {
+    name: 'get_priority_leads',
+    description: 'Get a filtered, sorted list of this agency\'s leads with the real reason each one is included - by hot/warm/cold status, by city, and/or leads that have gone stale (still "new" with no contact for several days). Reuses the existing lead score/pipeline stage, never a new scoring algorithm.',
+    parameters: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['hot', 'warm', 'cold'] },
+        city: { type: 'string' },
+        stale: { type: 'boolean', description: 'Only leads still in the "new" stage with no contact for several days' },
+      },
+    },
+    roles: ['agency_admin'],
+  },
+  get_team_activity: {
+    name: 'get_team_activity',
+    description: "Get real, transparent per-agent activity for this agency: how many properties each agent has, how many active (not-yet-closed) leads on their listings, and how many overdue CRM tasks are assigned to them.",
     parameters: { type: 'object', properties: {} },
     roles: ['agency_admin'],
   },
@@ -167,12 +301,29 @@ const TOOL_DEFINITIONS = {
   },
   list_platform_agencies: {
     name: 'list_platform_agencies',
-    description: 'List agencies on the platform with pagination.',
+    description: 'List agencies on the platform with pagination, optionally filtered by status (pending/active/suspended/rejected) or subscription plan (trial/starter/professional/enterprise).',
     parameters: {
       type: 'object',
-      properties: { page: { type: 'number' } },
+      properties: {
+        page: { type: 'number' },
+        status: { type: 'string', enum: ['pending', 'active', 'suspended', 'rejected'] },
+        inactiveOnly: { type: 'boolean', description: 'Any status other than active - there is no single "inactive" status value' },
+        plan: { type: 'string', enum: Object.keys(PLANS) },
+      },
     },
     roles: ['super_admin'],
+  },
+
+  // ---- FAQ (Phase 2 - Customer AI) ----
+  get_faq_answer: {
+    name: 'get_faq_answer',
+    description: 'Answer a common question about using DreamHomes as a property shopper - contacting an agent, favorites, inquiries, buying a property, whether an account is required, or scheduling a viewing.',
+    parameters: {
+      type: 'object',
+      properties: { topic: { type: 'string', enum: Object.keys(FAQ_TOPICS) } },
+      required: ['topic'],
+    },
+    roles: ['customer'],
   },
 
   // ---- User ----
@@ -246,7 +397,7 @@ const TOOL_DEFINITIONS = {
   },
   create_appointment: {
     name: 'create_appointment',
-    description: 'Schedule a new appointment/property viewing.',
+    description: "Schedule a new appointment/property viewing. When booked by a customer, relatedProperty is required so it can be assigned to that property's real listing agent.",
     parameters: {
       type: 'object',
       properties: {
@@ -257,7 +408,7 @@ const TOOL_DEFINITIONS = {
       },
       required: ['title', 'scheduledAt'],
     },
-    roles: ['agent', 'agency_admin'],
+    roles: ['customer', 'agent', 'agency_admin'],
     mutates: true,
   },
   get_upcoming_reminders: {
@@ -361,17 +512,127 @@ const EXECUTORS = {
       if (args.minPrice) filter.price.$gte = Number(args.minPrice);
       if (args.maxPrice) filter.price.$lte = Number(args.maxPrice);
     }
+    // areaUnit is filtered exactly (marla vs sqft), not converted - a
+    // listing entered in sqft is correctly excluded from a marla-range
+    // search rather than wrongly compared, since this app never converts
+    // between the two on the data side (see property.model.js).
+    if (args.minArea || args.maxArea) {
+      filter.area = {};
+      if (args.minArea) filter.area.$gte = Number(args.minArea);
+      if (args.maxArea) filter.area.$lte = Number(args.maxArea);
+      if (args.areaUnit) filter.areaUnit = args.areaUnit;
+    }
 
-    const items = await propertyRepository.find(ctx.tenantId, filter).sort({ createdAt: -1 }).limit(8).select(PROPERTY_LIST_FIELDS);
-    return { renderAs: 'property_cards', count: items.length, properties: items };
+    // Ranked by real, already-stored fields only - featured status and
+    // view count aren't new data, just a better sort of the same matched
+    // set (previously createdAt-only, which meant two searches for the
+    // exact same filter could surface an obscure listing ahead of an
+    // actively-promoted one with no signal behind the ordering at all).
+    //
+    // `count` is the real total matching this filter, from a genuine
+    // countDocuments query - NOT items.length. Before this fix, `count`
+    // WAS items.length, so any search with 8+ real matches always
+    // reported "Found 8 properties" verbatim regardless of whether the
+    // true total was 8 or 80, because it was counting the post-limit(8)
+    // page, not the actual match set. `shown` carries the display-page
+    // size separately so the reply can say "top 8 of 23" instead of
+    // silently claiming 8 was the whole answer.
+    // bedrooms is a $gte floor by design (see entities.js's
+    // extractBedrooms - "3 bedrooms" deliberately means "3+", already
+    // tested elsewhere), but a floor of 1 matches nearly every listing,
+    // so without this, a big featured/highly-viewed property with 6
+    // bedrooms would rank ahead of a genuinely close 1-2 bedroom match
+    // just because the base sort is featured-first - a real customer
+    // typing "1 bedroom house" reads that as visibly wrong, not a
+    // reasonable interpretation of "1+". When a bedroom count was
+    // requested, pull a wider candidate window and re-rank by how close
+    // each result's real bedroom count is to what was asked, with the
+    // original featured/views/createdAt order preserved as the tiebreak
+    // (Array.prototype.sort is stable) - the $gte filter and true total
+    // are unchanged, only which 8 of the matches get shown first.
+    //
+    // `sortBy` (from extractSortIntent) handles "cheapest"/"most
+    // expensive" the same way: this is a city-scoped question, so it
+    // correctly resolves here rather than to get_property_analytics
+    // (whose cheapest/expensive slices ignore city entirely) - it just
+    // needs to actually honor the price ordering instead of silently
+    // falling back to featured-first.
+    const candidateLimit = args.bedrooms || args.sortBy ? 40 : 8;
+    const [candidates, total] = await Promise.all([
+      propertyRepository.find(ctx.tenantId, filter).sort({ featured: -1, views: -1, createdAt: -1 }).limit(candidateLimit).select(PROPERTY_LIST_FIELDS),
+      propertyRepository.countDocuments(ctx.tenantId, filter),
+    ]);
+    let items = candidates;
+    if (args.bedrooms) {
+      items = [...items].sort((a, b) => Math.abs(a.bedrooms - args.bedrooms) - Math.abs(b.bedrooms - args.bedrooms));
+    } else if (args.sortBy === 'price_asc') {
+      items = [...items].sort((a, b) => a.price - b.price);
+    } else if (args.sortBy === 'price_desc') {
+      items = [...items].sort((a, b) => b.price - a.price);
+    }
+    items = items.slice(0, 8);
+    // Real rating data on every card the AI shows, same as the main
+    // site's search results (property.service.js's attachRatings).
+    items = await propertyService.attachRatings(ctx.tenantId, items);
+    return { renderAs: 'property_cards', count: total, shown: items.length, properties: items };
+  },
+
+  async get_my_properties(args, ctx) {
+    // Reuses listMyProperties exactly as-is (the same function
+    // AgentDashboard.jsx's "My Listings" tab already calls via
+    // GET /properties/mine) - every status (draft/available/sold), not
+    // just the public 'available' catalog search_properties searches.
+    // status/featured/sortBy are applied here, in JS, since
+    // listMyProperties itself takes no filter args - same pattern as
+    // search_properties' bedroom-proximity/price sort above.
+    let items = await propertyService.listMyProperties(ctx.tenantId, ctx.requester);
+    const total = items.length;
+
+    if (args.status) items = items.filter((p) => p.status === args.status);
+    if (args.featured !== undefined) items = items.filter((p) => Boolean(p.featured) === Boolean(args.featured));
+
+    const sorters = {
+      newest: (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+      most_viewed: (a, b) => b.views - a.views,
+      least_viewed: (a, b) => a.views - b.views,
+      most_expensive: (a, b) => b.price - a.price,
+      cheapest: (a, b) => a.price - b.price,
+    };
+    if (args.sortBy && sorters[args.sortBy]) items = [...items].sort(sorters[args.sortBy]);
+
+    const shown = items.slice(0, 8);
+    return { renderAs: 'property_cards', count: items.length, totalUnfiltered: total, shown: shown.length, properties: shown };
   },
 
   async get_property_details(args, ctx) {
-    const property = await propertyRepository.findById(ctx.tenantId, args.propertyId);
-    if (!property || (ctx.requester.role === 'customer' && property.status !== 'available')) {
+    // Reuses the exact same enrichment the real property detail page
+    // gets (property.service.js's getPropertyById -> attachAgencySummary:
+    // listing agent contact info, agency summary, real aggregated
+    // rating) instead of a bare repository read - previously this tool
+    // returned the raw Property doc only, so the AI could never answer
+    // "who's the agent for this?" or "what's it rated?" about a specific
+    // property even though that data exists and the real page shows it.
+    let property;
+    try {
+      property = await propertyService.getPropertyById(ctx.tenantId, args.propertyId);
+    } catch {
       return { error: 'Property not found.' };
     }
-    return { renderAs: 'property_cards', count: 1, properties: [property] };
+    if (ctx.requester.role === 'customer' && property.status !== 'available') {
+      return { error: 'Property not found.' };
+    }
+    // Same real computation the property page's "AI Price Insight" card
+    // uses (shared/utils/priceEstimate.js via propertyService.
+    // getPriceEstimate) - not a new estimate, just included by default so
+    // "tell me about this property" already answers the market-estimate
+    // question instead of requiring a separate query.
+    const priceInsight = propertyService.getPriceEstimate({
+      city: property.city,
+      area: property.area,
+      bedrooms: property.bedrooms,
+      bathrooms: property.bathrooms,
+    });
+    return { renderAs: 'property_cards', count: 1, properties: [property], priceInsight };
   },
 
   async compare_properties(args, ctx) {
@@ -392,13 +653,63 @@ const EXECUTORS = {
     }
   },
 
+  async get_favorite_properties(_args, ctx) {
+    const properties = await favoriteService.listFavoriteProperties(ctx.tenantId, ctx.requester.id);
+    return { renderAs: 'property_cards', count: properties.length, properties };
+  },
+
+  async add_favorite_property(args, ctx) {
+    try {
+      await favoriteService.addFavorite(ctx.tenantId, ctx.requester.id, args.propertyId);
+      return { favorited: true };
+    } catch (err) {
+      return { error: err.message };
+    }
+  },
+
+  async remove_favorite_property(args, ctx) {
+    await favoriteService.removeFavorite(ctx.tenantId, ctx.requester.id, args.propertyId);
+    return { favorited: false };
+  },
+
+  async submit_inquiry(args, ctx) {
+    try {
+      const inquiry = await inquiryService.createInquiry(ctx.tenantId, {
+        propertyId: args.propertyId,
+        customer: { name: ctx.requester.name, email: ctx.requester.email, phone: args.phone },
+        message: args.message,
+        budget: args.budget,
+        moveTimeline: args.moveTimeline,
+      });
+      return { renderAs: 'inquiry_submitted', inquiryId: inquiry._id, score: inquiry.score, status: inquiry.status };
+    } catch (err) {
+      return { error: err.message };
+    }
+  },
+
   async estimate_property_price(args) {
     return propertyService.getPriceEstimate(args);
   },
 
   async get_property_analytics(_args, ctx) {
-    const analytics = await propertyService.getAnalytics(ctx.tenantId);
-    return { renderAs: 'property_analytics', ...analytics };
+    const [analytics, mostFavorited, lowestRated, mostInquired] = await Promise.all([
+      propertyService.getAnalytics(ctx.tenantId),
+      // Real Favorite aggregation (favorite.service.js) - answers
+      // "most popular"/"most saved"/"highest customer engagement",
+      // previously nothing in this tool could speak to customer
+      // interest at all, only agent-facing view counts.
+      favoriteService.getMostFavoritedProperties(ctx.tenantId, { limit: 5 }),
+      // Same MIN_REVIEW_SAMPLE_SIZE floor as topRated, just inverted -
+      // answers "low-rated"/"needs improvement" honestly instead of
+      // silently having no such slice at all.
+      propertyReviewService.getLowestRatedProperties(ctx.tenantId, { limit: 5 }),
+      // Real Inquiry aggregation - "which property gets the most
+      // inquiries" is a distinct, stronger signal than views/favorites
+      // (actual expressed contact intent), answered with its own real
+      // data rather than substituting a different metric.
+      inquiryService.getMostInquiredProperties(ctx.tenantId, { limit: 5 }),
+    ]);
+    return { renderAs: 'property_analytics', ...analytics, mostFavorited, lowestRated, mostInquired };
   },
 
   async get_lead_stats(_args, ctx) {
@@ -415,6 +726,22 @@ const EXECUTORS = {
       return { error: 'Lead not found or not accessible to this user.' };
     }
 
+    // Phase 3 (Agent/Agency Admin AI) - real existence checks against
+    // this lead's own linked records, so the suggestion never tells the
+    // agent to do something already scheduled (see leadActions.js).
+    const [openTaskCount, upcomingAppointmentCount] = await Promise.all([
+      crmRepository.tasks.countDocuments(ctx.tenantId, { relatedInquiry: inquiry._id, status: { $ne: 'done' } }),
+      crmRepository.appointments.countDocuments(ctx.tenantId, { relatedInquiry: inquiry._id, status: 'scheduled', scheduledAt: { $gte: new Date() } }),
+    ]);
+
+    const suggestedAction = suggestLeadAction({
+      pipelineStage: inquiry.pipelineStage,
+      status: inquiry.status,
+      createdAt: inquiry.createdAt,
+      hasOpenTask: openTaskCount > 0,
+      hasUpcomingAppointment: upcomingAppointmentCount > 0,
+    });
+
     return {
       renderAs: 'lead_score_explanation',
       score: inquiry.score,
@@ -423,6 +750,8 @@ const EXECUTORS = {
       customer: inquiry.customer.name,
       budget: inquiry.budget,
       moveTimeline: inquiry.moveTimeline,
+      pipelineStage: inquiry.pipelineStage,
+      suggestedAction,
     };
   },
 
@@ -455,13 +784,262 @@ const EXECUTORS = {
     return { renderAs: 'agency_performance', ...result };
   },
 
+  // Phase 4 (Agency Admin AI) - reuses dashboardService.getSummary
+  // (the exact same data get_dashboard_summary already returns, incl.
+  // the real hot/warm/cold leadStatusBreakdown) rather than recomputing
+  // any of it, and adds only the handful of real counts that tool
+  // doesn't already carry (active-status properties, today's
+  // appointments, overdue tasks) via the existing tenant-scoped
+  // repositories.
+  async get_agency_overview(_args, ctx) {
+    const summary = await dashboardService.getSummary(ctx.tenantId, ctx.requester);
+    const now = new Date();
+    const endOfToday = new Date(now);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const [activeProperties, appointmentsToday, overdueTasks] = await Promise.all([
+      propertyRepository.countDocuments(ctx.tenantId, { status: 'available' }),
+      crmRepository.appointments.countDocuments(ctx.tenantId, { status: 'scheduled', scheduledAt: { $gte: now, $lte: endOfToday } }),
+      crmRepository.tasks.countDocuments(ctx.tenantId, { status: { $ne: 'done' }, dueDate: { $lt: now } }),
+    ]);
+
+    return {
+      renderAs: 'agency_overview',
+      totalProperties: summary.cards.totalProperties,
+      activeProperties,
+      totalInquiries: summary.cards.totalInquiries,
+      hotLeads: summary.cards.hotLeads,
+      leadStatusBreakdown: summary.charts.leadStatusBreakdown,
+      averageLeadScore: summary.cards.averageLeadScore,
+      appointmentsToday,
+      overdueTasks,
+      team: summary.cards.team,
+    };
+  },
+
+  // Phase 4 (Agency Admin AI) - reuses crmService.getUpcomingReminders
+  // (the exact same overdue-tasks/appointments data get_upcoming_
+  // reminders already returns) for the ATTENTION/TODAY buckets, and adds
+  // only the one thing that tool doesn't compute: which hot leads
+  // genuinely have no open follow-up yet (a real Task/Appointment
+  // existence check, same discipline as explain_lead_score's Phase 3
+  // suggestion - never a duplicate suggestion for a lead someone is
+  // already handling).
+  async get_agency_priorities(_args, ctx) {
+    const reminders = await crmService.getUpcomingReminders(ctx.tenantId, ctx.requester);
+    const now = new Date();
+    const endOfToday = new Date(now);
+    endOfToday.setHours(23, 59, 59, 999);
+    const appointmentsToday = reminders.upcomingAppointments.filter((a) => new Date(a.scheduledAt) <= endOfToday);
+
+    const propertyIds = await propertyRepository.find(ctx.tenantId, {}).distinct('_id');
+    const hotLeads = await inquiryRepository
+      .find(ctx.tenantId, { property: { $in: propertyIds }, status: 'hot', pipelineStage: { $nin: ['closed_won', 'closed_lost'] } })
+      .select('customer score createdAt')
+      .sort({ createdAt: 1 })
+      .limit(20);
+
+    const hotLeadIds = hotLeads.map((l) => l._id);
+    const [openTaskLeadIds, upcomingApptLeadIds] = await Promise.all([
+      crmRepository.tasks.find(ctx.tenantId, { relatedInquiry: { $in: hotLeadIds }, status: { $ne: 'done' } }).distinct('relatedInquiry'),
+      crmRepository.appointments.find(ctx.tenantId, { relatedInquiry: { $in: hotLeadIds }, status: 'scheduled', scheduledAt: { $gte: now } }).distinct('relatedInquiry'),
+    ]);
+    const covered = new Set([...openTaskLeadIds, ...upcomingApptLeadIds].map(String));
+    const hotLeadsNeedingFollowUp = hotLeads
+      .filter((l) => !covered.has(l._id.toString()))
+      .map((l) => ({ id: l._id, customer: l.customer.name, score: l.score, ageDays: daysSince(l.createdAt) }));
+
+    return {
+      renderAs: 'agency_priorities',
+      hotLeadsNeedingFollowUp,
+      appointmentsToday: appointmentsToday.map((a) => ({ title: a.title, scheduledAt: a.scheduledAt })),
+      overdueTasks: reminders.overdueTasks.map((t) => ({ title: t.title, dueDate: t.dueDate })),
+    };
+  },
+
+  // Phase 4 (Agency Admin AI) - filters/sorts real, already-stored lead
+  // fields (score, status, pipelineStage, createdAt, and city via the
+  // related property) - explicitly NOT a new scoring algorithm, the
+  // exact same score shared/utils/leadScoring.js already computed.
+  async get_priority_leads(args, ctx) {
+    let propertyFilter = {};
+    if (args.city) {
+      propertyFilter.city = new RegExp(`^${String(args.city).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+    }
+    const properties = await propertyRepository.find(ctx.tenantId, propertyFilter).select('city');
+    const propertyIds = properties.map((p) => p._id);
+    const cityById = new Map(properties.map((p) => [p._id.toString(), p.city]));
+
+    const inquiryFilter = { property: { $in: propertyIds }, pipelineStage: { $nin: ['closed_won', 'closed_lost'] } };
+    if (args.status) inquiryFilter.status = args.status;
+
+    let leads = await inquiryRepository
+      .find(ctx.tenantId, inquiryFilter)
+      .select('customer score status pipelineStage createdAt property')
+      .sort({ score: -1 })
+      .limit(30);
+
+    if (args.stale) {
+      leads = leads.filter((l) => l.pipelineStage === 'new' && daysSince(l.createdAt) >= 3);
+    }
+
+    const items = leads.slice(0, 10).map((l) => ({
+      id: l._id,
+      customer: l.customer.name,
+      score: l.score,
+      status: l.status,
+      pipelineStage: l.pipelineStage,
+      ageDays: daysSince(l.createdAt),
+      city: cityById.get(l.property.toString()),
+    }));
+
+    return { renderAs: 'priority_leads', count: leads.length, leads: items };
+  },
+
+  // Phase 4 (Agency Admin AI) - real, transparent per-agent counts only
+  // (properties, active leads on their listings, overdue tasks assigned
+  // to them) - no invented engagement/activity score, matching the
+  // instruction to prefer simple transparent calculations over a new
+  // scoring model.
+  async get_team_activity(_args, ctx) {
+    const agents = await User.find({ agencyId: ctx.tenantId, role: 'agent' }).select('name email').sort({ name: 1 });
+    if (!agents.length) return { renderAs: 'team_activity', agents: [] };
+
+    const agentIds = agents.map((a) => a._id);
+    const properties = await propertyRepository.find(ctx.tenantId, { agent: { $in: agentIds } }).select('agent');
+    const propertyToAgent = new Map(properties.map((p) => [p._id.toString(), p.agent.toString()]));
+    const allPropertyIds = properties.map((p) => p._id);
+
+    const [activeInquiries, overdueTasks] = await Promise.all([
+      inquiryRepository.find(ctx.tenantId, { property: { $in: allPropertyIds }, pipelineStage: { $nin: ['closed_won', 'closed_lost'] } }).select('property'),
+      crmRepository.tasks.find(ctx.tenantId, { assignedTo: { $in: agentIds }, status: { $ne: 'done' }, dueDate: { $lt: new Date() } }).select('assignedTo'),
+    ]);
+
+    const agentSummaries = agents.map((agent) => {
+      const id = agent._id.toString();
+      const propertyCount = properties.filter((p) => p.agent.toString() === id).length;
+      const activeLeads = activeInquiries.filter((i) => propertyToAgent.get(i.property.toString()) === id).length;
+      const overdue = overdueTasks.filter((t) => t.assignedTo.toString() === id).length;
+      return { name: agent.name, email: agent.email, propertyCount, activeLeads, overdueTasks: overdue };
+    });
+
+    return { renderAs: 'team_activity', agents: agentSummaries };
+  },
+
   async get_agency_branding(_args, ctx) {
     return agencyService.getBranding(ctx.tenantId);
   },
 
   async list_platform_agencies(args) {
-    const result = await platformAgenciesService.listAgencies({ page: args.page });
+    const result = await platformAgenciesService.listAgencies({
+      page: args.page,
+      status: args.inactiveOnly ? undefined : args.status,
+      statusNot: args.inactiveOnly ? 'active' : undefined,
+      plan: args.plan,
+    });
     return { renderAs: 'agency_table', ...result };
+  },
+
+  // Phase 5 (Super Admin / Platform AI) - real per-agency flags only,
+  // reusing billingService.computeUsage/PLANS exactly as billing.
+  // service.js's own assertWithinLimit already does (no second limit-
+  // checking implementation). Never a predictive/churn score - every
+  // flag is a plain threshold over real, current counts.
+  async get_platform_agency_health(_args) {
+    const APPROACHING_LIMIT_RATIO = 0.8;
+    const agencies = await Agency.find({ status: 'active' }).select('companyName slug subscriptionPlan');
+
+    const flagged = [];
+    for (const agency of agencies) {
+      // eslint-disable-next-line no-await-in-loop
+      const [agentCount, propertyCount] = await Promise.all([
+        User.countDocuments({ agencyId: agency._id, role: 'agent' }),
+        Property.countDocuments({ agencyId: agency._id }),
+      ]);
+      const plan = PLANS[agency.subscriptionPlan];
+      const usage = { properties: propertyCount, agents: agentCount };
+      const flags = [];
+
+      if (agentCount > 0 && propertyCount === 0) {
+        flags.push(`${agentCount} agent${agentCount === 1 ? '' : 's'} but no property listings`);
+      }
+      if (plan?.maxProperties !== Infinity && propertyCount >= plan.maxProperties * APPROACHING_LIMIT_RATIO) {
+        flags.push(`approaching its property limit (${propertyCount}/${plan.maxProperties})`);
+      }
+      if (plan?.maxAgents !== Infinity && agentCount >= plan.maxAgents * APPROACHING_LIMIT_RATIO) {
+        flags.push(`approaching its agent limit (${agentCount}/${plan.maxAgents})`);
+      }
+
+      if (flags.length) {
+        flagged.push({ agencyId: agency._id, companyName: agency.companyName, slug: agency.slug, plan: agency.subscriptionPlan, usage, flags });
+      }
+    }
+
+    return { renderAs: 'platform_agency_health', count: flagged.length, agencies: flagged };
+  },
+
+  // Phase 5 (Super Admin / Platform AI) - reuses the existing pending-
+  // agency review queue (platformAgenciesService.listAgencies, the same
+  // data the Agency Management page's "Pending Approval" tab already
+  // shows) for HIGH PRIORITY, and this tool's own health signals above
+  // for ATTENTION - no new data source for either bucket.
+  async get_platform_priorities() {
+    const [pending, health] = await Promise.all([
+      platformAgenciesService.listAgencies({ status: 'pending', limit: 10 }),
+      EXECUTORS.get_platform_agency_health({}),
+    ]);
+
+    return {
+      renderAs: 'platform_priorities',
+      pendingAgencies: pending.items.map((a) => ({ companyName: a.companyName, slug: a.slug })),
+      pendingTotal: pending.pagination.total,
+      flaggedAgencies: health.agencies,
+    };
+  },
+
+  // Phase 5 (Super Admin / Platform AI) - one parameterized ranking tool
+  // instead of four near-identical ones. 'properties'/'agents' reuse
+  // plain countDocuments grouping (same shape platform/dashboard.
+  // service.js's own mostActiveAgencies already uses for properties);
+  // 'inquiries'/'favorites' are genuinely new platform-wide aggregations
+  // (the existing inquiryService.getMostInquiredProperties/favoriteService.
+  // getMostFavoritedProperties rank PROPERTIES within one tenant, not
+  // AGENCIES across the platform - a different grouping key, not a
+  // duplicate of either).
+  async get_platform_rankings(args) {
+    const RANKING_MODELS = { properties: Property, inquiries: Inquiry, favorites: Favorite };
+    let raw;
+    if (args.metric === 'agents') {
+      raw = await User.aggregate([
+        { $match: { role: 'agent' } },
+        { $group: { _id: '$agencyId', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 5 },
+      ]);
+    } else {
+      const Model = RANKING_MODELS[args.metric];
+      raw = await Model.aggregate([
+        { $group: { _id: '$agencyId', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 5 },
+      ]);
+    }
+
+    const agencyIds = raw.map((r) => r._id).filter(Boolean);
+    const agencies = await Agency.find({ _id: { $in: agencyIds } }).select('companyName slug');
+    const agencyById = new Map(agencies.map((a) => [a._id.toString(), a]));
+
+    const items = raw
+      .filter((r) => r._id && agencyById.has(r._id.toString()))
+      .map((r) => ({ companyName: agencyById.get(r._id.toString()).companyName, slug: agencyById.get(r._id.toString()).slug, count: r.count }));
+
+    return { renderAs: 'platform_rankings', metric: args.metric, agencies: items };
+  },
+
+  async get_faq_answer(args) {
+    const entry = FAQ_TOPICS[args.topic];
+    if (!entry) return { error: "I don't have an answer for that yet - try asking your question a different way." };
+    return { topic: args.topic, question: entry.question, answer: entry.answer };
   },
 
   async get_current_user(_args, ctx) {
@@ -508,11 +1086,30 @@ const EXECUTORS = {
   },
 
   async create_appointment(args, ctx) {
+    // appointment.model.js's assignedTo is required and is what agents'
+    // own calendars are actually filtered by (crm.service.js's
+    // scopeFilter) - crmService.createAppointment() defaults it to the
+    // caller's own id when not given, which is correct for an agent
+    // booking their own viewing, but would silently assign a customer's
+    // booking to the customer's own user id (not a real agent), making
+    // it invisible to any agent's calendar. Resolved here to the
+    // property's real listing agent instead, for a customer only.
+    let assignedTo;
+    if (ctx.requester.role === 'customer') {
+      if (!args.relatedProperty) {
+        return { error: 'Which property would you like to view? I need that to schedule it with the right agent.' };
+      }
+      const property = await propertyRepository.findById(ctx.tenantId, args.relatedProperty);
+      if (!property) return { error: 'Property not found.' };
+      assignedTo = property.agent;
+    }
+
     const appointment = await crmService.createAppointment(ctx.tenantId, ctx.requester, {
       title: args.title,
       scheduledAt: args.scheduledAt,
       location: args.location,
       relatedProperty: args.relatedProperty,
+      assignedTo,
     });
     return { renderAs: 'appointment_list', count: 1, appointments: [appointment] };
   },
